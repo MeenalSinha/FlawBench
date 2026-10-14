@@ -27,7 +27,7 @@ Planned flaw categories: excessive pauses, local pacing deviations, local energy
 8. Show audio comparisons, feature graphs, detections, and explanations.
 9. Export reproducible results.
 
-## Current scope: Phases 1, 2, and 3 (implemented)
+## Current scope: Phases 1, 2, 3, and 4 (implemented)
 
 | Capability | Status |
 |---|---|
@@ -47,12 +47,19 @@ Planned flaw categories: excessive pauses, local pacing deviations, local energy
 | Dynamic Time Warping (DTW) reference alignment and differential acoustic analysis | Implemented (Phase 3) |
 | Feature persistence store, caching, validation, and JSONL manifest | Implemented (Phase 3) |
 | Interactive Plotly time-series curves, MFCC heatmap, and comparison UI panel | Implemented (Phase 3) |
+| Independent, label-blind speech flaw detection engine (`pause_insertion`, `tempo_change`, `energy_reduction`) | Implemented (Phase 4) |
+| Temporal flaw localization on variant timeline with integer sample boundaries `[start_sample, end_sample)` | Implemented (Phase 4) |
+| Measured acoustic evidence scoring and detector configuration fingerprints | Implemented (Phase 4) |
+| Strict ground-truth isolation architecture & automated leakage prevention | Implemented (Phase 4) |
+| Result persistence store, cache invalidation, detection validator, JSONL manifest | Implemented (Phase 4) |
+| Interactive Streamlit flaw detection panel with variant audio playback & evidence drilldown | Implemented (Phase 4) |
 | Pitch-variation flattening | Planned extension, not implemented |
-| Flaw detection, metrics, explanations | Planned (Phases 4 to 6) |
+| Formal benchmark metrics & quantitative evaluation against labels | Planned (Phase 5) |
+| Evidence-linked natural language explanations & participant dashboard | Planned (Phase 6) |
 
-FlawBench extracts real acoustic features and performs differential reference comparison. Independent flaw detection and evaluation benchmarks will be introduced in Phases 4 & 5.
+FlawBench extracts real acoustic features, computes differential DTW alignments, and independently detects speech delivery flaws without accessing ground-truth labels. Formal quantitative benchmark scoring against labels will be introduced in Phase 5.
 
-## Dataset and Feature workflow (Phases 2 & 3)
+## FlawBench End-to-End Workflow (Phases 2, 3 & 4)
 
 ```bash
 # 1. Register a recording you are allowed to modify (rights must be confirmed)
@@ -77,6 +84,12 @@ python -m flawbench features validate
 # 5. Differential reference comparison & candidate anomaly analysis
 python -m flawbench features compare --sample smp-...
 python -m flawbench features export --output outputs/reports/feature_summaries.json
+
+# 6. Run independent flaw detection (label-blind inference)
+python -m flawbench detect --all
+python -m flawbench detect --sample smp-... --export outputs/reports/predictions.json
+python -m flawbench detect list
+python -m flawbench detect validate
 ```
 
 Schema, timeline convention, seed policy: `docs/dataset_schema.md`. Severity profiles are experimental
@@ -178,11 +191,14 @@ ruff check src tests app.py && mypy
   margins and are not aligned to speech boundaries. Manifests assume a single writer process.
 - Output reproducibility is verified on the tested environment only; library or platform changes can alter
   tempo output (detected, never silently replaced). Windows and macOS were not exercised.
-- Generated metadata (`data/metadata`) is git-ignored by default; commit or archive it deliberately if wanted.
+- Phase 3 & 4: DTW temporal alignment assumes that the spoken content order is preserved; non-linear phrase reorderings or severe background noise may degrade alignment reliability.
+- DTW warp-slope thresholding estimates delivery rate anomalies relative to the reference recording; natural stylistic speech variations that are not flaw injections may trigger candidate warnings if thresholds are set too sensitively.
+- Evidence scores reflect acoustic deviation magnitudes relative to reference features; they are not calibrated probabilities of real-world human speech competence.
+- Detections and predictions are completely label-free; formal benchmark metrics against ground truth are evaluated separately in Phase 5.
 
 ## Planned phases
 
-3 Feature extraction; 4 Flaw detection; 5 Evaluation; 6 Explanations and dashboard. See `docs/architecture.md` for the planned interfaces.
+5 Evaluation (comparison of predictions against ground truth, quantitative precision/recall/IoU metrics); 6 Explanations and dashboard (evidence-linked natural language summaries, final participant dashboard). See `docs/architecture.md` for the planned interfaces.
 
 ## Data and audio licensing
 

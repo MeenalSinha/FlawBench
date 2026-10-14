@@ -381,9 +381,7 @@ def extract_features(
                 mono_signal = np.ascontiguousarray(audio.mean(axis=1), dtype=np.float32)
                 num_samples = audio.shape[0]
         else:
-            raise FeatureExtractionError(
-                f"Audio array must be 1D or 2D, got shape {audio.shape}."
-            )
+            raise FeatureExtractionError(f"Audio array must be 1D or 2D, got shape {audio.shape}.")
     else:
         raise FeatureExtractionError(f"Unsupported audio type: {type(audio)}.")
 
@@ -413,8 +411,10 @@ def extract_features(
     # Construct canonical FrameSchema
     start_samples = np.arange(num_frames, dtype=np.int64) * hop_length
     end_samples = np.minimum(num_samples, start_samples + frame_length).astype(np.int64)
-    valid_samples = np.maximum(0, np.minimum(num_samples - start_samples, frame_length)).astype(np.int64)
-    padded = ((start_samples + frame_length) > num_samples)
+    valid_samples = np.maximum(0, np.minimum(num_samples - start_samples, frame_length)).astype(
+        np.int64
+    )
+    padded = (start_samples + frame_length) > num_samples
     center_times_sec = (start_samples + end_samples) / (2.0 * sr)
 
     frame_schema = FrameSchema(
@@ -545,16 +545,17 @@ def extract_features(
         else hashlib.sha256(mono_signal.tobytes()).hexdigest()
     )
     artifact_id = (
-        audio_input.artifact_id
-        if audio_input is not None
-        else f"feat-{audio_sha256[:12]}"
+        audio_input.artifact_id if audio_input is not None else f"feat-{audio_sha256[:12]}"
     )
     source_id = audio_input.source_id if audio_input is not None else "direct_audio"
     sample_id = audio_input.sample_id if audio_input is not None else None
     role = audio_input.role.value if audio_input is not None else AudioRole.REFERENCE.value
 
     # Config fingerprint
-    cfg_items = f"{feat_cfg.frame_ms}_{feat_cfg.hop_ms}_{feat_cfg.n_mfcc}_{feat_cfg.pitch_backend}_{feat_cfg.f0_min_hz}_{feat_cfg.f0_max_hz}"
+    cfg_items = (
+        f"{feat_cfg.frame_ms}_{feat_cfg.hop_ms}_{feat_cfg.n_mfcc}_"
+        f"{feat_cfg.pitch_backend}_{feat_cfg.f0_min_hz}_{feat_cfg.f0_max_hz}"
+    )
     config_fingerprint = hashlib.sha256(cfg_items.encode("utf-8")).hexdigest()[:16]
 
     software = collect_software_versions()

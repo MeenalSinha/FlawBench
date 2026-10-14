@@ -55,7 +55,6 @@ def collect_software_versions() -> dict[str, str]:
     return versions
 
 
-
 def build_provenance(config: Config, *, seed: int | None = None) -> dict[str, Any]:
     """Collect software versions, platform, configuration snapshot and an optional random seed."""
     return {

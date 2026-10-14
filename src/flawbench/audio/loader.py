@@ -77,7 +77,6 @@ class LoadedAudio:
     def channels(self) -> int:
         return self.num_channels
 
-
     @property
     def num_samples(self) -> int:
         return int(self.samples.shape[1])

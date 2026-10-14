@@ -16,13 +16,21 @@ def test_derived_directories_follow_configuration(config: Config) -> None:
     assert paths.reports_dir == paths.output_dir / "reports"
     assert paths.figures_dir == paths.output_dir / "figures"
     assert paths.reference_dir == config.storage.reference_dir
+    assert paths.detection_dir == config.detection.detection_dir
 
 
 def test_ensure_output_directories_creates_nested_writable_dirs_only(config: Config) -> None:
     paths = ProjectPaths(config)
     created = paths.ensure_output_directories()
     assert all(p.is_dir() for p in created)
-    assert {p.name for p in created} == {"generated", "metadata", "reports", "figures", "features"}
+    assert {p.name for p in created} == {
+        "generated",
+        "metadata",
+        "reports",
+        "figures",
+        "features",
+        "detections",
+    }
     assert not paths.reference_dir.exists()  # input directory is never created
 
 

@@ -9,7 +9,7 @@ from flawbench.__main__ import main
 from flawbench.config import Config, load_config
 from flawbench.paths import ProjectPaths
 from flawbench.provenance import build_provenance, config_fingerprint
-from flawbench.roadmap import IMPLEMENTED, PHASES
+from flawbench.roadmap import IMPLEMENTED, PHASES, PLANNED
 from flawbench.status import collect_status
 
 
@@ -48,9 +48,9 @@ def test_status_hides_paths_unless_requested(config: Config) -> None:
     assert str(config.project_root) in shown
 
 
-def test_phases_one_two_and_three_are_marked_implemented() -> None:
-    assert [p.number for p in PHASES if p.status == IMPLEMENTED] == [1, 2, 3]
-
+def test_phases_one_through_four_are_marked_implemented() -> None:
+    assert [p.number for p in PHASES if p.status == IMPLEMENTED] == [1, 2, 3, 4]
+    assert [p.number for p in PHASES if p.status == PLANNED] == [5, 6]
 
 
 def test_cli_config_check_init_and_errors(

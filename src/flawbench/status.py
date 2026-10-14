@@ -87,4 +87,3 @@ def collect_status(
     items.append(dataset_status(config, paths))
     items.append(features_status(config, paths))
     return items
-

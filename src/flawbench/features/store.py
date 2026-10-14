@@ -126,7 +126,7 @@ class FeatureStore:
 
         entries: list[FeatureManifestEntry] = []
         try:
-            with open(self.manifest_file, "r", encoding="utf-8") as f:
+            with open(self.manifest_file, encoding="utf-8") as f:
                 for line in f:
                     stripped = line.strip()
                     if stripped:
@@ -135,9 +135,7 @@ class FeatureStore:
             raise FeatureStoreError("Failed to parse feature manifest.", detail=str(exc)) from exc
         return entries
 
-    def get_by_checksum(
-        self, audio_sha256: str, config_fingerprint: str
-    ) -> FeatureResult | None:
+    def get_by_checksum(self, audio_sha256: str, config_fingerprint: str) -> FeatureResult | None:
         """Look up cached FeatureResult by audio checksum and config fingerprint."""
         if self.cache_policy == "always_recompute":
             return None

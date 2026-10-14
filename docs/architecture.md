@@ -104,10 +104,76 @@ config), `schema` (record shapes and timeline helpers), `io` (checksums, atomic 
 annotations), `plan` (plan parsing and expansion), `generator` (seed derivation, identity, transaction,
 batch), `validator`, `splits`, `export`.
 
-Boundaries: generation writes audio plus annotation; a future detector receives audio only; evaluation joins
+Boundaries: generation writes audio plus annotation; detectors receive audio and label-free features only; evaluation joins
 predictions and annotations afterwards. Nothing in Phase 2 reads annotations to produce predictions.
 
 Transaction per variant: compute in memory, write temp file, decode it back and compare, re-verify the source
 checksum, rename into place, rewrite the manifest atomically; on manifest failure the new file is removed (or
 the previous one restored). A crash between rename and manifest leaves an orphan that the validator reports and
 that regeneration adopts only if byte-identical.
+
+## Phase 3: feature extraction & time-series analysis
+
+```mermaid
+flowchart LR
+    A[LoadedAudio: ref / var] --> EX[FeatureExtractor: canonical grid]
+    EX --> F1[RMS & dB Energy]
+    EX --> F2[Zero-Crossing Rate]
+    EX --> F3[Spectral Centroid, Bandwidth, Rolloff]
+    EX --> F4[MFCCs 13-dim]
+    EX --> F5[F0 Pitch: pyin / yin]
+    EX --> FS[FeatureStore: .npz + .json]
+    FS --> DTW[Dynamic Time Warping Alignment: MFCC Euclidean]
+    DTW --> CMP[FeatureComparisonResult: warp slope, delta RMS, pitch diff]
+```
+
+Canonical frame grid: 25 ms frame length, 10 ms hop interval, centered STFT. Time index for frame `i`: `t = i * hop_seconds`. Feature artifacts are cached with audio SHA-256 and configuration fingerprint.
+
+## Phase 4: independent speech flaw detection & ground-truth isolation
+
+Phase 4 introduces an independent, label-blind detection layer that inspects variant speech alongside the reference and produces timestamped flaw hypotheses with measured acoustic evidence.
+
+### Architectural Ground-Truth Isolation
+
+```mermaid
+flowchart TD
+    subgraph Phase 2 Dataset Generation
+        REF_REC[Reference Audio WAV]
+        VAR_REC[Variant Audio WAV]
+        GT[manifest.jsonl: flaw_type, severity, output_interval, source_interval]
+    end
+
+    subgraph Phase 4 Independent Detection Pipeline
+        LF_IN[DetectionInput: label-free audio, features & DTW comparison]
+        REF_REC --> LF_IN
+        VAR_REC --> LF_IN
+        
+        LF_IN --> DET_P[PauseDetector: DTW freeze / silence diff]
+        LF_IN --> DET_T[TempoDetector: local warp slope ratio]
+        LF_IN --> DET_E[EnergyReductionDetector: aligned delta RMS]
+        
+        DET_P --> PP[PostProcessor: gap merge, duration filter, boundary check]
+        DET_T --> PP
+        DET_E --> PP
+        
+        PP --> RES[DetectionResult: predictions, sample intervals, evidence]
+        RES --> STORE[DetectionStore: detections/ + manifest.jsonl]
+    end
+
+    subgraph Phase 5 Formal Evaluation (Deferred)
+        EVAL[Evaluation Engine]
+        GT -.->|Labels joined ONLY at evaluation time| EVAL
+        STORE -.->|Predictions joined by sample_id| EVAL
+        EVAL --> METRICS[IoU, Precision, Recall, F1]
+    end
+
+    style GT fill:#ffcccc,stroke:#cc0000,stroke-width:2px
+    style LF_IN fill:#ccffcc,stroke:#009900,stroke-width:2px
+```
+
+### Isolation Guarantees
+
+1. **No Label Flow**: The `DetectionInput` data structure only encapsulates audio waveforms, sample rates, durations, acoustic feature arrays, and DTW alignment curves. Ground-truth annotations (`flaw_type`, `severity`, `output_interval`, `source_interval`) are never loaded or passed into the detection engine.
+2. **Annotation Invariance**: Mutating flaw annotations in `manifest.jsonl` without modifying the audio files produces byte-identical detection outputs.
+3. **Forbidden Key Audit**: `DetectionValidator` scans detection result files for any forbidden ground-truth keys (`ground_truth`, `injected_interval`, `output_interval`, `source_interval`, `severity`, etc.) and rejects contaminated artifacts.
+4. **Canonical Half-Open Representation**: All detected intervals are localized on the variant timeline using integer sample indices `[start_sample, end_sample)` and corresponding seconds `[start_sec, end_sec)`. Reference intervals are recorded separately only when DTW correspondence is unambiguous.

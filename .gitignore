@@ -24,9 +24,11 @@ htmlcov/
 data/generated/
 data/metadata/
 data/features/
+data/detections/
 data/tmp/
 outputs/
 *.tmp
+uv.lock
 
 
 # Audio is not committed by default: check licensing first (see data/reference/README.md)

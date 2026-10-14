@@ -36,12 +36,11 @@ PHASES: tuple[Phase, ...] = (
         "Time-indexed acoustic features for reference and modified recordings.",
         IMPLEMENTED,
     ),
-
     Phase(
         4,
         "Flaw detection",
         "Independent, label-blind detection and temporal localization.",
-        PLANNED,
+        IMPLEMENTED,
     ),
     Phase(5, "Evaluation", "Comparison of predictions against ground truth and metrics.", PLANNED),
     Phase(

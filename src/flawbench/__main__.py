@@ -159,8 +159,29 @@ def build_parser() -> argparse.ArgumentParser:
     _add_config_option(f_exp, is_sub=True)
     f_exp.add_argument("--output", help="output JSON file path (default: stdout)")
 
-    return parser
+    # ---- Phase 4: detection engine ---------------------------------------------------
+    det = sub.add_parser("detect", help="flaw detection & temporal localization engine")
+    _add_config_option(det, is_sub=True)
+    det.add_argument(
+        "action",
+        nargs="?",
+        choices=["list", "validate"],
+        help="action to perform (list saved detections or validate artifacts)",
+    )
+    det.add_argument("--sample", help="committed sample id to run flaw detection on")
+    det.add_argument(
+        "--all", action="store_true", help="run flaw detection for all samples in dataset"
+    )
+    det.add_argument(
+        "--list", action="store_true", help="list saved detection results from manifest"
+    )
+    det.add_argument("--validate", action="store_true", help="validate stored detection results")
+    det.add_argument(
+        "--force", action="store_true", help="force recomputation ignoring cached results"
+    )
+    det.add_argument("--export", help="export detection predictions summary to JSON file")
 
+    return parser
 
 
 def _run_phase1(args: argparse.Namespace, config: Config) -> int:
@@ -334,12 +355,18 @@ def _run_features(args: argparse.Namespace, config: Config) -> int:
         if args.sample:
             cmp_res = pipeline.compare_variant_to_reference(args.sample, force_extract=args.force)
             print(f"Compared {cmp_res.variant_artifact_id} vs {cmp_res.ref_artifact_id}:")
-            print(f"  DTW cost: {cmp_res.dtw_cost:.3f} (normalized: {cmp_res.normalized_dtw_cost:.4f})")
+            print(
+                f"  DTW cost: {cmp_res.dtw_cost:.3f} "
+                f"(normalized: {cmp_res.normalized_dtw_cost:.4f})"
+            )
             print(f"  Path length: {cmp_res.path_length} points")
             print(f"  Mean delta RMS: {cmp_res.global_metrics.get('mean_delta_rms_db', 0):.2f} dB")
             print(f"  Candidate flaw regions: {len(cmp_res.candidate_regions)}")
             for r in cmp_res.candidate_regions:
-                print(f"    - [{r.get('flaw_hypothesis')}] var [{r.get('var_start_sec')} - {r.get('var_end_sec')})s")
+                print(
+                    f"    - [{r.get('flaw_hypothesis')}] "
+                    f"var [{r.get('var_start_sec')} - {r.get('var_end_sec')})s"
+                )
             return 0
         if args.all:
             results = pipeline.compare_all(force_extract=args.force)
@@ -379,6 +406,91 @@ def _run_features(args: argparse.Namespace, config: Config) -> int:
     raise AssertionError(cmd)  # pragma: no cover
 
 
+def _run_detect(args: argparse.Namespace, config: Config) -> int:
+    from flawbench.detection.pipeline import DetectionPipeline
+
+    pipeline = DetectionPipeline(config=config)
+    action = getattr(args, "action", None)
+
+    if action == "list" or getattr(args, "list", False):
+        entries = pipeline.list_detections()
+        print(f"Stored detections: {len(entries)}")
+        for e in entries:
+            print(
+                f"  Sample: {e['sample_id']} (source: {e['source_id']}) -> "
+                f"{e['predictions_count']} prediction(s) [candidates: {e['raw_candidates_count']}]"
+            )
+        return 0
+
+    if action == "validate" or getattr(args, "validate", False):
+        report = pipeline.validate_detections()
+        total = len(report)
+        valid = sum(1 for p in report.values() if not p)
+        print(f"Detection results validation: {valid}/{total} valid files")
+        has_problems = False
+        for fname, problems in report.items():
+            if problems:
+                has_problems = True
+                print(f"  [FAIL] {fname}:", file=sys.stderr)
+                for prob in problems:
+                    print(f"    - {prob}", file=sys.stderr)
+        return 1 if has_problems else 0
+
+    if getattr(args, "sample", None):
+        sample_id = args.sample
+        force = getattr(args, "force", False)
+        result = pipeline.detect_sample(sample_id, force=force)
+        print(
+            f"Detection completed for sample '{sample_id}' "
+            f"({len(result.predictions)} flaw(s) predicted, "
+            f"{result.raw_candidates_count} raw candidates):"
+        )
+        for i, p in enumerate(result.predictions):
+            ref_info = (
+                f", ref: [{p.ref_start_sec:.2f}s - {p.ref_end_sec:.2f}s]"
+                if p.ref_start_sec is not None
+                else ""
+            )
+            print(
+                f"  [{i + 1}] {p.flaw_type}: {p.start_sec:.2f}s - {p.end_sec:.2f}s "
+                f"(samples [{p.start_sample}:{p.end_sample}], dur: {p.duration_sec:.2f}s"
+                f"{ref_info}) strength={p.evidence_strength:.2f} detector={p.detector_id}"
+            )
+            for ek, ev in p.evidence.items():
+                print(f"      {ek}: {ev}")
+        if getattr(args, "export", None):
+            export_path = Path(args.export).resolve()
+            export_path.parent.mkdir(parents=True, exist_ok=True)
+            export_path.write_text(json.dumps(result.to_dict(), indent=2), encoding="utf-8")
+            print(f"Exported prediction to {export_path}")
+        return 0
+
+    if getattr(args, "all", False):
+        force = getattr(args, "force", False)
+        summary = pipeline.detect_all(force=force)
+        print(
+            f"Batch detection complete: "
+            f"{summary['processed']}/{summary['total']} processed, "
+            f"{summary['cached']} cached, {summary['failed']} failed | "
+            f"{summary['with_candidates']} with flaws detected, "
+            f"{summary['zero_candidates']} zero-flaw results."
+        )
+        if getattr(args, "export", None):
+            export_path = Path(args.export).resolve()
+            export_path.parent.mkdir(parents=True, exist_ok=True)
+            export_data = [r.to_dict() for r in summary["results"]]
+            export_path.write_text(json.dumps(export_data, indent=2), encoding="utf-8")
+            print(f"Exported batch predictions to {export_path}")
+        return 0 if summary["failed"] == 0 else 1
+
+    print(
+        "Please specify an action (list, validate) or detection target (--sample, --all). "
+        "Use --help for usage.",
+        file=sys.stderr,
+    )
+    return 2
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     try:
@@ -395,6 +507,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _run_dataset(args, config)
         if args.command == "features":
             return _run_features(args, config)
+        if args.command == "detect":
+            return _run_detect(args, config)
         return _run_phase1(args, config)
     except FlawBenchError as exc:
         print(
@@ -405,7 +519,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     except ValueError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
-
 
 
 if __name__ == "__main__":

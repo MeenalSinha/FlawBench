@@ -91,3 +91,18 @@ class FeatureStoreError(FeatureError):
 class FeatureComparisonError(FeatureError):
     """Differential analysis between reference and variant features failed."""
 
+
+class DetectionError(FlawBenchError):
+    """Base class for Phase 4 flaw detection and temporal localization failures."""
+
+
+class DetectionInputError(DetectionError):
+    """Input resolution or construction of label-free detection input failed."""
+
+
+class DetectionStoreError(DetectionError):
+    """Persistence or retrieval of detection artifacts failed."""
+
+
+class DetectionValidationError(DetectionError):
+    """Integrity check of saved detection results failed."""

@@ -8,11 +8,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from flawbench.audio.loader import LoadedAudio
 from flawbench.config import load_config
 from flawbench.exceptions import FeatureExtractionError
 from flawbench.features.extractor import FeatureResult, extract_features
-from flawbench.features.schema import FEATURE_SCHEMA_VERSION, AudioInput, AudioRole
+from flawbench.features.schema import FEATURE_SCHEMA_VERSION
 
 
 def _generate_tone(
@@ -41,6 +40,7 @@ def test_extract_features_framing_and_shapes() -> None:
     hop_length = int(round(sr * (feat_cfg.hop_ms / 1000.0)))  # 10 ms = 160 samples
     expected_frames = int(math.ceil(len(y) / hop_length))  # ceil(20000 / 160) = 125
 
+    assert frame_length == 400
     assert res.num_frames == expected_frames
     assert res.rms.shape == (expected_frames,)
     assert res.rms_db.shape == (expected_frames,)

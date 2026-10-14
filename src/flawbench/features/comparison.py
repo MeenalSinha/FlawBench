@@ -152,24 +152,28 @@ def _detect_candidate_flaw_regions(
             drop_end = i
             duration = var_times[drop_end] - var_times[drop_start]
             if duration >= 0.1:  # min 100 ms
-                mean_drop = float(np.mean(delta_rms_db[drop_start:drop_end + 1]))
-                candidates.append({
-                    "flaw_hypothesis": "energy_reduction",
-                    "var_start_sec": round(float(var_times[drop_start]), 4),
-                    "var_end_sec": round(float(var_times[drop_end]), 4),
-                    "ref_start_sec": round(float(ref_times[drop_start]), 4),
-                    "ref_end_sec": round(float(ref_times[drop_end]), 4),
-                    "duration_sec": round(float(duration), 4),
-                    "mean_delta_rms_db": round(mean_drop, 2),
-                    "min_delta_rms_db": round(float(np.min(delta_rms_db[drop_start:drop_end + 1])), 2),
-                })
+                mean_drop = float(np.mean(delta_rms_db[drop_start : drop_end + 1]))
+                candidates.append(
+                    {
+                        "flaw_hypothesis": "energy_reduction",
+                        "var_start_sec": round(float(var_times[drop_start]), 4),
+                        "var_end_sec": round(float(var_times[drop_end]), 4),
+                        "ref_start_sec": round(float(ref_times[drop_start]), 4),
+                        "ref_end_sec": round(float(ref_times[drop_end]), 4),
+                        "duration_sec": round(float(duration), 4),
+                        "mean_delta_rms_db": round(mean_drop, 2),
+                        "min_delta_rms_db": round(
+                            float(np.min(delta_rms_db[drop_start : drop_end + 1])), 2
+                        ),
+                    }
+                )
 
     # 2. Pause insertion candidate search (variant advances while reference is frozen or low energy)
     in_pause = False
     pause_start = 0
     for i in range(1, n_points):
-        ref_frozen = (warp_path[i, 0] == warp_path[i - 1, 0])
-        var_quiet = (var_rms_db[i] <= -35.0)
+        ref_frozen = warp_path[i, 0] == warp_path[i - 1, 0]
+        var_quiet = var_rms_db[i] <= -35.0
         is_pause_point = ref_frozen or var_quiet
 
         if is_pause_point and not in_pause:
@@ -180,14 +184,18 @@ def _detect_candidate_flaw_regions(
             pause_end = i
             duration = var_times[pause_end] - var_times[pause_start]
             if duration >= 0.15:  # min 150 ms
-                candidates.append({
-                    "flaw_hypothesis": "pause_insertion",
-                    "var_start_sec": round(float(var_times[pause_start]), 4),
-                    "var_end_sec": round(float(var_times[pause_end]), 4),
-                    "ref_anchor_sec": round(float(ref_times[pause_start]), 4),
-                    "duration_sec": round(float(duration), 4),
-                    "mean_var_rms_db": round(float(np.mean(var_rms_db[pause_start:pause_end + 1])), 2),
-                })
+                candidates.append(
+                    {
+                        "flaw_hypothesis": "pause_insertion",
+                        "var_start_sec": round(float(var_times[pause_start]), 4),
+                        "var_end_sec": round(float(var_times[pause_end]), 4),
+                        "ref_anchor_sec": round(float(ref_times[pause_start]), 4),
+                        "duration_sec": round(float(duration), 4),
+                        "mean_var_rms_db": round(
+                            float(np.mean(var_rms_db[pause_start : pause_end + 1])), 2
+                        ),
+                    }
+                )
 
     # 3. Tempo change candidate search (significant deviation of local slope from 1.0)
     in_tempo = False
@@ -203,16 +211,18 @@ def _detect_candidate_flaw_regions(
             tempo_end = i
             duration = var_times[tempo_end] - var_times[tempo_start]
             if duration >= 0.3:  # min 300 ms
-                mean_slope = float(np.mean(local_slope[tempo_start:tempo_end + 1]))
-                candidates.append({
-                    "flaw_hypothesis": "tempo_change",
-                    "var_start_sec": round(float(var_times[tempo_start]), 4),
-                    "var_end_sec": round(float(var_times[tempo_end]), 4),
-                    "ref_start_sec": round(float(ref_times[tempo_start]), 4),
-                    "ref_end_sec": round(float(ref_times[tempo_end]), 4),
-                    "duration_sec": round(float(duration), 4),
-                    "mean_relative_rate": round(1.0 / max(1e-4, mean_slope), 3),
-                })
+                mean_slope = float(np.mean(local_slope[tempo_start : tempo_end + 1]))
+                candidates.append(
+                    {
+                        "flaw_hypothesis": "tempo_change",
+                        "var_start_sec": round(float(var_times[tempo_start]), 4),
+                        "var_end_sec": round(float(var_times[tempo_end]), 4),
+                        "ref_start_sec": round(float(ref_times[tempo_start]), 4),
+                        "ref_end_sec": round(float(ref_times[tempo_end]), 4),
+                        "duration_sec": round(float(duration), 4),
+                        "mean_relative_rate": round(1.0 / max(1e-4, mean_slope), 3),
+                    }
+                )
 
     return candidates
 
@@ -244,7 +254,8 @@ def compare_features(
 
     if X.shape[0] != Y.shape[0]:
         raise FeatureComparisonError(
-            f"MFCC feature dimension mismatch: reference has {X.shape[0]}, variant has {Y.shape[0]}."
+            f"MFCC feature dimension mismatch: reference has {X.shape[0]}, "
+            f"variant has {Y.shape[0]}."
         )
 
     try:
@@ -282,7 +293,9 @@ def compare_features(
     # Spectral distance (Euclidean distance across MFCCs along warp path)
     ref_mfcc_aligned = ref_features.mfcc[ref_indices]
     var_mfcc_aligned = var_features.mfcc[var_indices]
-    spectral_distance = np.linalg.norm(ref_mfcc_aligned - var_mfcc_aligned, axis=1).astype(np.float64)
+    spectral_distance = np.linalg.norm(ref_mfcc_aligned - var_mfcc_aligned, axis=1).astype(
+        np.float64
+    )
 
     # Local slope calculation: dt_var / dt_ref with sliding window smoothing
     window = 5

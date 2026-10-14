@@ -11,12 +11,11 @@ try:
     from flawbench.audio.loader import load_audio
     from flawbench.config import Config, defaults, load_config
     from flawbench.exceptions import AudioInputError, ConfigurationError, FlawBenchError
+    from flawbench.features.extractor import extract_features
     from flawbench.logging_config import configure_logging, get_logger, log_failure
     from flawbench.paths import ProjectPaths
     from flawbench.roadmap import PHASES
     from flawbench.status import collect_status
-    from flawbench.features.extractor import extract_features
-
     from flawbench.ui.components import (
         render_header,
         render_metadata,
@@ -24,6 +23,7 @@ try:
         render_status,
     )
     from flawbench.ui.dataset_panel import render_dataset_panel
+    from flawbench.ui.detection_panel import render_detection_panel
     from flawbench.ui.feature_panel import (
         render_feature_result_plots,
         render_features_panel,
@@ -72,6 +72,8 @@ def main() -> None:
 
     render_features_panel(config, paths, expose_details=expose)
 
+    render_detection_panel(config, paths, expose_details=expose)
+
     st.subheader("Reference audio")
     st.caption(
         "Upload a recording to validate and inspect it. Files are processed in memory and are "
@@ -97,18 +99,19 @@ def main() -> None:
         else:
             render_metadata(audio.metadata)
             st.audio(data)
-            with st.expander("Extract and inspect time-indexed acoustic features", expanded=True):
-                with st.spinner("Extracting features from uploaded audio..."):
-                    try:
-                        feat_res = extract_features(audio, feat_cfg=config.features, config=config)
-                        render_feature_result_plots(feat_res, title_prefix=uploaded.name)
-                    except FlawBenchError as f_exc:
-                        st.error(f"Feature extraction failed: {f_exc.public_message(expose_details=expose)}")
-            st.info("Analysis complete for acoustic features. Flaw detection is planned for Phase 4.")
+            with (
+                st.expander("Extract and inspect time-indexed acoustic features", expanded=True),
+                st.spinner("Extracting features from uploaded audio..."),
+            ):
+                try:
+                    feat_res = extract_features(audio, feat_cfg=config.features, config=config)
+                    render_feature_result_plots(feat_res, title_prefix=uploaded.name)
+                except FlawBenchError as f_exc:
+                    msg = f_exc.public_message(expose_details=expose)
+                    st.error(f"Feature extraction failed: {msg}")
+            st.info("Analysis complete for acoustic features and speech flaw detection (Phase 4).")
     else:
         st.info("No audio selected. Analysis has not been performed.")
-
-
 
     if config.ui.show_roadmap:
         render_roadmap(PHASES)

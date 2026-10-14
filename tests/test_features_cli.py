@@ -53,7 +53,9 @@ def cli_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, str,
     return tmp_path, source.source_id, v_res.record.sample_id
 
 
-def test_cli_features_extract_and_list(cli_env: tuple[Path, str, str], capsys: pytest.CaptureFixture[str]) -> None:
+def test_cli_features_extract_and_list(
+    cli_env: tuple[Path, str, str], capsys: pytest.CaptureFixture[str]
+) -> None:
     _, source_id, sample_id = cli_env
 
     # 1. Extract reference
@@ -82,7 +84,9 @@ def test_cli_features_extract_and_list(cli_env: tuple[Path, str, str], capsys: p
     assert "Feature store valid: True" in captured.out
 
 
-def test_cli_features_compare_and_export(cli_env: tuple[Path, str, str], capsys: pytest.CaptureFixture[str]) -> None:
+def test_cli_features_compare_and_export(
+    cli_env: tuple[Path, str, str], capsys: pytest.CaptureFixture[str]
+) -> None:
     tmp_path, source_id, sample_id = cli_env
 
     # Compare sample

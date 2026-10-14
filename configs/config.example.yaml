@@ -69,3 +69,37 @@ dataset:
     energy_reduction:
       gain_db: {min: -60.0, max: -0.5}
       segment_sec: {min: 0.05, max: 30.0}
+
+features:
+  frame_ms: 25.0
+  hop_ms: 10.0
+  n_mfcc: 13
+  spectral_rolloff_p: 0.85
+  pitch_backend: librosa_pyin
+  f0_min_hz: 75.0
+  f0_max_hz: 600.0
+  channel_policy: mono_mix
+  silence_threshold_db: -40.0
+  min_silence_ms: 50.0
+  features_dir: data/features
+  feature_manifest_filename: feature_manifest.jsonl
+  cache_policy: skip_if_valid
+  max_feature_seconds: 600.0
+  schema_version: "3.0"
+
+detection:
+  enabled_detectors: ["pause_insertion", "tempo_change", "energy_reduction"]
+  pause_silence_threshold_db: -35.0
+  pause_min_duration_sec: 0.15
+  pause_min_difference_sec: 0.10
+  tempo_ratio_min_deviation: 0.15
+  tempo_min_duration_sec: 0.25
+  energy_reduction_threshold_db: -4.0
+  energy_reduction_min_duration_sec: 0.15
+  merge_gap_sec: 0.05
+  min_candidate_duration_sec: 0.08
+  detection_dir: data/detections
+  detection_manifest_filename: detections_manifest.jsonl
+  cache_policy: skip_if_valid
+  schema_version: "4.0"
+

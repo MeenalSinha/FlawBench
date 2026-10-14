@@ -15,8 +15,8 @@ from flawbench.audio.loader import load_audio
 from flawbench.config import Config, load_config
 from flawbench.dataset.io import read_jsonl_lenient
 from flawbench.dataset.registry import SourceRegistry
-from flawbench.dataset.schema import SampleRecord, SourceRecord
-from flawbench.exceptions import DatasetError, FeatureError, FeatureStoreError
+from flawbench.dataset.schema import SampleRecord
+from flawbench.exceptions import DatasetError, FeatureError
 from flawbench.features.comparison import ComparisonResult, compare_features
 from flawbench.features.extractor import FeatureResult, extract_features
 from flawbench.features.schema import AudioInput, AudioRole
@@ -93,7 +93,9 @@ class FeaturePipeline:
     def _load_manifest_sample(self, sample_id: str) -> tuple[SampleRecord, Path]:
         """Find a sample in manifest.jsonl and resolve its audio file."""
         if not self.paths.manifest_file.is_file():
-            raise FeatureError("Dataset manifest does not exist.", detail=str(self.paths.manifest_file))
+            raise FeatureError(
+                "Dataset manifest does not exist.", detail=str(self.paths.manifest_file)
+            )
 
         rows, problems = read_jsonl_lenient(self.paths.manifest_file)
         if problems:

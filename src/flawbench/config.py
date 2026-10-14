@@ -40,6 +40,9 @@ VALID_OUTPUT_SUBTYPES = ("FLOAT", "PCM_16", "PCM_24")
 VALID_FEATURE_CHANNEL_POLICIES = ("mono_mix",)  # extensible; only mono downmix implemented in P3
 VALID_PITCH_BACKENDS = ("librosa_yin", "librosa_pyin")  # librosa backends for F0 estimation
 VALID_FEATURE_CACHE_POLICIES = ("skip_if_valid", "always_recompute")
+VALID_DETECTION_CATEGORIES = ("pause_insertion", "tempo_change", "energy_reduction")
+VALID_DETECTION_CACHE_POLICIES = ("skip_if_valid", "always_recompute")
+
 
 DEFAULT_SEVERITY_PROFILES: dict[str, dict[str, dict[str, float]]] = {
     "pause_insertion": {
@@ -172,7 +175,107 @@ _FIELDS: tuple[_Field, ...] = (
     _Field("features", "cache_policy", "str", "skip_if_valid", "FLAWBENCH_FEAT_CACHE_POLICY"),
     _Field("features", "max_feature_seconds", "float", 600.0, "FLAWBENCH_FEAT_MAX_SECONDS"),
     _Field("features", "schema_version", "str", "3.0", "FLAWBENCH_FEAT_SCHEMA_VERSION"),
+    # ---- Phase 4: detection settings --------------------------------------------------
+    _Field(
+        "detection",
+        "enabled_detectors",
+        "list",
+        ["pause_insertion", "tempo_change", "energy_reduction"],
+        "FLAWBENCH_DETECT_ENABLED",
+    ),
+    _Field(
+        "detection",
+        "pause_silence_threshold_db",
+        "float",
+        -35.0,
+        "FLAWBENCH_DETECT_PAUSE_THRESH_DB",
+    ),
+    _Field(
+        "detection",
+        "pause_min_duration_sec",
+        "float",
+        0.15,
+        "FLAWBENCH_DETECT_PAUSE_MIN_SEC",
+    ),
+    _Field(
+        "detection",
+        "pause_min_difference_sec",
+        "float",
+        0.10,
+        "FLAWBENCH_DETECT_PAUSE_DIFF_SEC",
+    ),
+    _Field(
+        "detection",
+        "tempo_ratio_min_deviation",
+        "float",
+        0.15,
+        "FLAWBENCH_DETECT_TEMPO_DEV",
+    ),
+    _Field(
+        "detection",
+        "tempo_min_duration_sec",
+        "float",
+        0.25,
+        "FLAWBENCH_DETECT_TEMPO_MIN_SEC",
+    ),
+    _Field(
+        "detection",
+        "energy_reduction_threshold_db",
+        "float",
+        -4.0,
+        "FLAWBENCH_DETECT_ENERGY_THRESH_DB",
+    ),
+    _Field(
+        "detection",
+        "energy_reduction_min_duration_sec",
+        "float",
+        0.15,
+        "FLAWBENCH_DETECT_ENERGY_MIN_SEC",
+    ),
+    _Field(
+        "detection",
+        "merge_gap_sec",
+        "float",
+        0.05,
+        "FLAWBENCH_DETECT_MERGE_GAP_SEC",
+    ),
+    _Field(
+        "detection",
+        "min_candidate_duration_sec",
+        "float",
+        0.08,
+        "FLAWBENCH_DETECT_MIN_CAND_SEC",
+    ),
+    _Field(
+        "detection",
+        "detection_dir",
+        "path",
+        "data/detections",
+        "FLAWBENCH_DETECTIONS_DIR",
+    ),
+    _Field(
+        "detection",
+        "detection_manifest_filename",
+        "filename",
+        "detections_manifest.jsonl",
+        "FLAWBENCH_DETECT_MANIFEST_FILENAME",
+    ),
+    _Field(
+        "detection",
+        "cache_policy",
+        "str",
+        "skip_if_valid",
+        "FLAWBENCH_DETECT_CACHE_POLICY",
+    ),
+    _Field(
+        "detection",
+        "schema_version",
+        "str",
+        "4.0",
+        "FLAWBENCH_DETECT_SCHEMA_VERSION",
+    ),
 )
+
 
 _SCHEMA: dict[str, dict[str, _Field]] = {}
 for _f in _FIELDS:
@@ -274,6 +377,26 @@ class FeaturesSettings:
 
 
 @dataclass(frozen=True)
+class DetectionSettings:
+    """Phase 4 flaw-detection and temporal localization settings."""
+
+    enabled_detectors: tuple[str, ...]
+    pause_silence_threshold_db: float
+    pause_min_duration_sec: float
+    pause_min_difference_sec: float
+    tempo_ratio_min_deviation: float
+    tempo_min_duration_sec: float
+    energy_reduction_threshold_db: float
+    energy_reduction_min_duration_sec: float
+    merge_gap_sec: float
+    min_candidate_duration_sec: float
+    detection_dir: Path
+    detection_manifest_filename: str
+    cache_policy: str
+    schema_version: str
+
+
+@dataclass(frozen=True)
 class Config:
     app: AppSettings
     storage: StorageSettings
@@ -282,6 +405,7 @@ class Config:
     diagnostics: DiagnosticsSettings
     dataset: DatasetSettings
     features: FeaturesSettings
+    detection: DetectionSettings
     project_root: Path
     config_file: Path | None
 
@@ -291,6 +415,8 @@ class Config:
         data["storage"] = {k: str(v) for k, v in data["storage"].items()}
         data["audio"]["allowed_extensions"] = list(self.audio.allowed_extensions)
         data["features"]["features_dir"] = str(self.features.features_dir)
+        data["detection"]["detection_dir"] = str(self.detection.detection_dir)
+        data["detection"]["enabled_detectors"] = list(self.detection.enabled_detectors)
         data["project_root"] = str(self.project_root)
         data["config_file"] = str(self.config_file) if self.config_file else None
         return data
@@ -377,8 +503,12 @@ def _coerce(field: _Field, value: Any, source: str) -> Any:
             raise bad("a list of strings")
         normalized = []
         for item in items:
-            ext = item.strip().lower()
-            normalized.append(ext if ext.startswith(".") else f".{ext}")
+            s = item.strip()
+            if field.key == "allowed_extensions":
+                s = s.lower()
+                normalized.append(s if s.startswith(".") else f".{s}")
+            else:
+                normalized.append(s)
         return normalized
     if field.kind == "float":
         if isinstance(value, bool):
@@ -548,7 +678,9 @@ def _build_dataset(ds: dict[str, Any]) -> DatasetSettings:
 def _build_features(ft: dict[str, Any], root: Path) -> FeaturesSettings:
     """Validate and construct :class:`FeaturesSettings`."""
     if ft["frame_ms"] <= 0:
-        raise ConfigurationError("features.frame_ms must be positive.", detail=f"got {ft['frame_ms']}")
+        raise ConfigurationError(
+            "features.frame_ms must be positive.", detail=f"got {ft['frame_ms']}"
+        )
     if ft["hop_ms"] <= 0:
         raise ConfigurationError("features.hop_ms must be positive.", detail=f"got {ft['hop_ms']}")
     if ft["hop_ms"] > ft["frame_ms"]:
@@ -557,7 +689,9 @@ def _build_features(ft: dict[str, Any], root: Path) -> FeaturesSettings:
             detail=f"hop={ft['hop_ms']} frame={ft['frame_ms']}",
         )
     if ft["n_mfcc"] < 1:
-        raise ConfigurationError("features.n_mfcc must be at least 1.", detail=f"got {ft['n_mfcc']}")
+        raise ConfigurationError(
+            "features.n_mfcc must be at least 1.", detail=f"got {ft['n_mfcc']}"
+        )
     if not (0.0 < ft["spectral_rolloff_p"] < 1.0):
         raise ConfigurationError(
             "features.spectral_rolloff_p must be in (0, 1).",
@@ -569,7 +703,9 @@ def _build_features(ft: dict[str, Any], root: Path) -> FeaturesSettings:
             detail=f"got {ft['pitch_backend']!r}",
         )
     if ft["f0_min_hz"] <= 0:
-        raise ConfigurationError("features.f0_min_hz must be positive.", detail=f"got {ft['f0_min_hz']}")
+        raise ConfigurationError(
+            "features.f0_min_hz must be positive.", detail=f"got {ft['f0_min_hz']}"
+        )
     if ft["f0_max_hz"] <= ft["f0_min_hz"]:
         raise ConfigurationError(
             "features.f0_max_hz must be greater than features.f0_min_hz.",
@@ -619,8 +755,88 @@ def _build_features(ft: dict[str, Any], root: Path) -> FeaturesSettings:
     )
 
 
+def _build_detection(dt: dict[str, Any], root: Path) -> DetectionSettings:
+    detectors = list(dict.fromkeys(dt["enabled_detectors"]))
+    if not detectors:
+        raise ConfigurationError("detection.enabled_detectors must not be empty.")
+    invalid_detectors = [d for d in detectors if d not in VALID_DETECTION_CATEGORIES]
+    if invalid_detectors:
+        raise ConfigurationError(
+            f"Unsupported detector(s): {', '.join(invalid_detectors)}.",
+            detail=f"supported: {', '.join(VALID_DETECTION_CATEGORIES)}",
+        )
+    if dt["pause_silence_threshold_db"] > 0:
+        raise ConfigurationError(
+            "detection.pause_silence_threshold_db must be negative or zero (dB scale).",
+            detail=f"got {dt['pause_silence_threshold_db']}",
+        )
+    if dt["pause_min_duration_sec"] <= 0:
+        raise ConfigurationError(
+            "detection.pause_min_duration_sec must be positive.",
+            detail=f"got {dt['pause_min_duration_sec']}",
+        )
+    if dt["pause_min_difference_sec"] < 0:
+        raise ConfigurationError(
+            "detection.pause_min_difference_sec must be non-negative.",
+            detail=f"got {dt['pause_min_difference_sec']}",
+        )
+    if dt["tempo_ratio_min_deviation"] <= 0:
+        raise ConfigurationError(
+            "detection.tempo_ratio_min_deviation must be positive.",
+            detail=f"got {dt['tempo_ratio_min_deviation']}",
+        )
+    if dt["tempo_min_duration_sec"] <= 0:
+        raise ConfigurationError(
+            "detection.tempo_min_duration_sec must be positive.",
+            detail=f"got {dt['tempo_min_duration_sec']}",
+        )
+    if dt["energy_reduction_threshold_db"] >= 0:
+        raise ConfigurationError(
+            "detection.energy_reduction_threshold_db must be negative (dB drop).",
+            detail=f"got {dt['energy_reduction_threshold_db']}",
+        )
+    if dt["energy_reduction_min_duration_sec"] <= 0:
+        raise ConfigurationError(
+            "detection.energy_reduction_min_duration_sec must be positive.",
+            detail=f"got {dt['energy_reduction_min_duration_sec']}",
+        )
+    if dt["merge_gap_sec"] < 0:
+        raise ConfigurationError(
+            "detection.merge_gap_sec must be non-negative.",
+            detail=f"got {dt['merge_gap_sec']}",
+        )
+    if dt["min_candidate_duration_sec"] <= 0:
+        raise ConfigurationError(
+            "detection.min_candidate_duration_sec must be positive.",
+            detail=f"got {dt['min_candidate_duration_sec']}",
+        )
+    if dt["cache_policy"] not in VALID_DETECTION_CACHE_POLICIES:
+        raise ConfigurationError(
+            f"detection.cache_policy must be one of: {', '.join(VALID_DETECTION_CACHE_POLICIES)}.",
+            detail=f"got {dt['cache_policy']!r}",
+        )
+
+    detection_dir = _resolve_dir(root, dt["detection_dir"], "detection.detection_dir")
+    return DetectionSettings(
+        enabled_detectors=tuple(detectors),
+        pause_silence_threshold_db=float(dt["pause_silence_threshold_db"]),
+        pause_min_duration_sec=float(dt["pause_min_duration_sec"]),
+        pause_min_difference_sec=float(dt["pause_min_difference_sec"]),
+        tempo_ratio_min_deviation=float(dt["tempo_ratio_min_deviation"]),
+        tempo_min_duration_sec=float(dt["tempo_min_duration_sec"]),
+        energy_reduction_threshold_db=float(dt["energy_reduction_threshold_db"]),
+        energy_reduction_min_duration_sec=float(dt["energy_reduction_min_duration_sec"]),
+        merge_gap_sec=float(dt["merge_gap_sec"]),
+        min_candidate_duration_sec=float(dt["min_candidate_duration_sec"]),
+        detection_dir=detection_dir,
+        detection_manifest_filename=str(dt["detection_manifest_filename"]),
+        cache_policy=str(dt["cache_policy"]),
+        schema_version=str(dt["schema_version"]),
+    )
+
+
 def _build(values: dict[str, dict[str, Any]], root: Path, config_file: Path | None) -> Config:
-    app, storage, audio, ui, diag, ds, ft = (
+    app, storage, audio, ui, diag, ds, ft, dt = (
         values["app"],
         values["storage"],
         values["audio"],
@@ -628,6 +844,7 @@ def _build(values: dict[str, dict[str, Any]], root: Path, config_file: Path | No
         values["diagnostics"],
         values["dataset"],
         values["features"],
+        values["detection"],
     )
 
     environment = str(app["environment"]).lower()
@@ -683,6 +900,7 @@ def _build(values: dict[str, dict[str, Any]], root: Path, config_file: Path | No
 
     dataset = _build_dataset(ds)
     features = _build_features(ft, root)
+    detection = _build_detection(dt, root)
 
     return Config(
         app=AppSettings(str(app["name"]), environment, log_level),
@@ -700,6 +918,7 @@ def _build(values: dict[str, dict[str, Any]], root: Path, config_file: Path | No
         ),
         dataset=dataset,
         features=features,
+        detection=detection,
         project_root=root,
         config_file=config_file,
     )

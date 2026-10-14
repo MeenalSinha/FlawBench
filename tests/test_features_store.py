@@ -13,9 +13,13 @@ from flawbench.features.schema import AudioInput, AudioRole
 from flawbench.features.store import FeatureStore
 
 
-def _synthetic_result(artifact_id: str, audio_sha: str = "abc123456789") -> tuple[np.ndarray, AudioInput]:
+def _synthetic_result(
+    artifact_id: str, audio_sha: str = "abc123456789"
+) -> tuple[np.ndarray, AudioInput]:
     sr = 16000
-    y = np.sin(2 * np.pi * 300 * np.linspace(0, 0.3, int(0.3 * sr), endpoint=False)).astype(np.float32)
+    y = np.sin(2 * np.pi * 300 * np.linspace(0, 0.3, int(0.3 * sr), endpoint=False)).astype(
+        np.float32
+    )
     inp = AudioInput(
         artifact_id=artifact_id,
         source_id="src-test",

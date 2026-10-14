@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import numpy as np
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import streamlit as st
+from plotly.subplots import make_subplots
 
 from flawbench.config import Config
 from flawbench.exceptions import FlawBenchError
@@ -44,7 +44,9 @@ def render_feature_result_plots(result: FeatureResult, title_prefix: str = "") -
     # 1. Energy & Silence
     fig_rms = go.Figure()
     fig_rms.add_trace(
-        go.Scatter(x=times, y=result.rms_db, mode="lines", name="RMS (dB)", line=dict(color="#1f77b4"))
+        go.Scatter(
+            x=times, y=result.rms_db, mode="lines", name="RMS (dB)", line=dict(color="#1f77b4")
+        )
     )
     thresh = result.metadata.silence_threshold_db
     fig_rms.add_hline(
@@ -124,7 +126,7 @@ def render_feature_result_plots(result: FeatureResult, title_prefix: str = "") -
             data=go.Heatmap(
                 z=result.mfcc.T,
                 x=times,
-                y=[f"MFCC {i+1}" for i in range(result.mfcc.shape[1])],
+                y=[f"MFCC {i + 1}" for i in range(result.mfcc.shape[1])],
                 colorscale="Viridis",
             )
         )
@@ -163,9 +165,7 @@ def render_comparison_plots(comparison: ComparisonResult) -> None:
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("DTW Normalized Cost", f"{comparison.normalized_dtw_cost:.3f}")
     m2.metric("Duration Ratio", f"{comparison.global_metrics.get('duration_ratio', 1.0):.2f}")
-    m3.metric(
-        "Mean Delta RMS", f"{comparison.global_metrics.get('mean_delta_rms_db', 0.0):.2f} dB"
-    )
+    m3.metric("Mean Delta RMS", f"{comparison.global_metrics.get('mean_delta_rms_db', 0.0):.2f} dB")
     m4.metric("Candidate Anomaly Regions", len(comparison.candidate_regions))
 
     # 1. DTW Warp Path & Differential Energy
@@ -218,9 +218,7 @@ def render_comparison_plots(comparison: ComparisonResult) -> None:
         row=2,
         col=1,
     )
-    fig_dtw.add_hline(
-        y=0.0, line_dash="solid", line_color="#333333", row=2, col=1
-    )
+    fig_dtw.add_hline(y=0.0, line_dash="solid", line_color="#333333", row=2, col=1)
     fig_dtw.add_hline(
         y=-6.0,
         line_dash="dot",
@@ -263,7 +261,8 @@ def render_features_panel(config: Config, paths: ProjectPaths, *, expose_details
     """Streamlit UI panel for Phase 3 Feature Extraction & Time-Series Comparison."""
     st.subheader("Acoustic Features & Time-Series Analysis (Phase 3)")
     st.caption(
-        "Extract canonical time-indexed acoustic features (RMS energy, F0 pitch, spectral features, MFCCs) "
+        "Extract canonical time-indexed acoustic features "
+        "(RMS energy, F0 pitch, spectral features, MFCCs) "
         "and perform DTW differential comparison between variants and references."
     )
 
@@ -323,10 +322,10 @@ def render_features_panel(config: Config, paths: ProjectPaths, *, expose_details
             st.info("No variant feature artifacts in store. Extract dataset variants first.")
             return
 
-        var_options = {
-            f"{v.sample_id} (derived from {v.source_id})": v.sample_id for v in variants
-        }
-        chosen_var_label = st.selectbox("Select variant sample to compare", list(var_options.keys()))
+        var_options = {f"{v.sample_id} (derived from {v.source_id})": v.sample_id for v in variants}
+        chosen_var_label = st.selectbox(
+            "Select variant sample to compare", list(var_options.keys())
+        )
         if chosen_var_label:
             sid = var_options[chosen_var_label]
             if st.button("Compute Differential Comparison"):

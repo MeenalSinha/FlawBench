@@ -22,4 +22,3 @@ __all__ = [
     "compare_features",
     "extract_features",
 ]
-

@@ -5,12 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
-import pytest
 
-from flawbench.exceptions import FeatureComparisonError
 from flawbench.features.comparison import ComparisonResult, compare_features
 from flawbench.features.extractor import extract_features
-from flawbench.features.schema import AudioInput, AudioRole
 
 
 def _sine(freq: float, dur: float, sr: int = 16000, amp: float = 0.5) -> np.ndarray:
@@ -52,7 +49,9 @@ def test_comparison_energy_reduction_detected() -> None:
 
     assert cmp_res.global_metrics["min_delta_rms_db"] < -6.0
     # Should detect energy_reduction candidate
-    er_candidates = [c for c in cmp_res.candidate_regions if c["flaw_hypothesis"] == "energy_reduction"]
+    er_candidates = [
+        c for c in cmp_res.candidate_regions if c["flaw_hypothesis"] == "energy_reduction"
+    ]
     assert len(er_candidates) >= 1
     c = er_candidates[0]
     assert c["var_start_sec"] >= 0.2 and c["var_end_sec"] <= 0.9
@@ -77,7 +76,9 @@ def test_comparison_pause_insertion_detected() -> None:
 
     assert cmp_res.global_metrics["duration_ratio"] > 1.3
     # Check for pause candidate
-    pause_candidates = [c for c in cmp_res.candidate_regions if c["flaw_hypothesis"] == "pause_insertion"]
+    pause_candidates = [
+        c for c in cmp_res.candidate_regions if c["flaw_hypothesis"] == "pause_insertion"
+    ]
     assert len(pause_candidates) >= 1
 
 
