@@ -27,7 +27,7 @@ Planned flaw categories: excessive pauses, local pacing deviations, local energy
 8. Show audio comparisons, feature graphs, detections, and explanations.
 9. Export reproducible results.
 
-## Current scope: Phases 1, 2, 3, and 4 (implemented)
+## Current scope: Phases 1, 2, 3, 4, and 5 (implemented)
 
 | Capability | Status |
 |---|---|
@@ -53,13 +53,21 @@ Planned flaw categories: excessive pauses, local pacing deviations, local energy
 | Strict ground-truth isolation architecture & automated leakage prevention | Implemented (Phase 4) |
 | Result persistence store, cache invalidation, detection validator, JSONL manifest | Implemented (Phase 4) |
 | Interactive Streamlit flaw detection panel with variant audio playback & evidence drilldown | Implemented (Phase 4) |
+| Deterministic 1-to-1 event-level temporal matching using half-open sample IoU | Implemented (Phase 5) |
+| Quantitative classification metrics (per-category and micro/macro precision, recall, F1) | Implemented (Phase 5) |
+| Temporal localization metrics (mean/median IoU, boundary start/end/duration MAE in seconds) | Implemented (Phase 5) |
+| Multi-threshold localization-tolerance curves ($\theta_{\text{IoU}} \in [0.3, 0.9]$) | Implemented (Phase 5) |
+| Event-level classification confusion matrix & error attribution (missed vs spurious) | Implemented (Phase 5) |
+| Clean negative identity controls & false-alarm rate auditing | Implemented (Phase 5) |
+| Source-level cluster bootstrap 95% confidence intervals | Implemented (Phase 5) |
+| Immutable evaluation store, catalog manifest, and artifact validation | Implemented (Phase 5) |
+| Interactive Streamlit Evaluation Lab panel with KPI cards, Plotly curves, and confusion heatmaps | Implemented (Phase 5) |
 | Pitch-variation flattening | Planned extension, not implemented |
-| Formal benchmark metrics & quantitative evaluation against labels | Planned (Phase 5) |
 | Evidence-linked natural language explanations & participant dashboard | Planned (Phase 6) |
 
-FlawBench extracts real acoustic features, computes differential DTW alignments, and independently detects speech delivery flaws without accessing ground-truth labels. Formal quantitative benchmark scoring against labels will be introduced in Phase 5.
+FlawBench extracts real acoustic features, computes differential DTW alignments, independently detects speech delivery flaws without accessing ground-truth labels, and rigorously benchmarks predicted intervals against known truth using deterministic one-to-one temporal IoU matching.
 
-## FlawBench End-to-End Workflow (Phases 2, 3 & 4)
+## FlawBench End-to-End Workflow (Phases 2, 3, 4 & 5)
 
 ```bash
 # 1. Register a recording you are allowed to modify (rights must be confirmed)
@@ -90,11 +98,16 @@ python -m flawbench detect --all
 python -m flawbench detect --sample smp-... --export outputs/reports/predictions.json
 python -m flawbench detect list
 python -m flawbench detect validate
+
+# 7. Run formal evaluation & benchmark scoring against ground truth
+python -m flawbench evaluate run --split test
+python -m flawbench evaluate run --split all
+python -m flawbench evaluate list
+python -m flawbench evaluate report --run <run_id>
+python -m flawbench evaluate validate --run <run_id>
 ```
 
-Schema, timeline convention, seed policy: `docs/dataset_schema.md`. Severity profiles are experimental
-manipulation strengths, not human-rated severities. No audio is shipped: you must supply a recording you
-have the rights to use. Tests use synthetic tones only.
+Schema, timeline convention, seed policy: `docs/dataset_schema.md`. Evaluation methodology and schema: `docs/evaluation_methodology.md` and `docs/evaluation_schema.md`. Severity profiles are experimental manipulation strengths, not human-rated severities. No audio is shipped: you must supply a recording you have the rights to use. Tests use synthetic tones only.
 
 ## Technology stack
 
@@ -124,15 +137,22 @@ FlawBench/
     status.py                 Real component status
     roadmap.py                Phase list (informational)
     ui/components.py          Streamlit rendering helpers
-    ui/dataset_panel.py       Real dataset counts and a validate button (calls the same engine)
-    dataset/                  Phase 2 engine: params, schema, io, registry, injectors, plan,
-                              generator, validator, splits, export
-    __main__.py               CLI: config, check, init, provenance
+    ui/dataset_panel.py       Dataset management and validation panel
+    ui/feature_panel.py       Acoustic feature inspection and DTW comparison panel
+    ui/detection_panel.py     Independent flaw detection and candidate drilldown panel
+    ui/evaluation_panel.py    Formal Evaluation Lab panel (KPIs, curves, confusion matrix)
+    dataset/                  Phase 2 engine: schema, registry, injectors, plan, splits, validator
+    features/                 Phase 3 engine: frame grid, extractors, DTW comparison, store
+    detection/                Phase 4 engine: label-free inputs, detectors, store, validator
+    evaluation/               Phase 5 engine: 1-to-1 matching, metrics, confusion, controls, store
+    __main__.py               CLI: config, check, dataset, features, detect, evaluate
   tests/                      pytest suite
-  data/reference/             Reference recordings (contents git-ignored; see its README)
+  data/reference/             Reference recordings (contents git-ignored)
   configs/plan.example.yaml   Example generation plan
   docs/                       architecture.md, development.md, dataset_schema.md,
-                              phase_1_completion.md, phase_2_completion.md
+                              detection_methodology.md, detection_schema.md,
+                              evaluation_methodology.md, evaluation_schema.md,
+                              phase_1_completion.md through phase_5_completion.md
 ```
 
 `data/generated/`, `data/metadata/` (manifests), and `outputs/{reports,figures,exports}/` are created at runtime
@@ -194,11 +214,13 @@ ruff check src tests app.py && mypy
 - Phase 3 & 4: DTW temporal alignment assumes that the spoken content order is preserved; non-linear phrase reorderings or severe background noise may degrade alignment reliability.
 - DTW warp-slope thresholding estimates delivery rate anomalies relative to the reference recording; natural stylistic speech variations that are not flaw injections may trigger candidate warnings if thresholds are set too sensitively.
 - Evidence scores reflect acoustic deviation magnitudes relative to reference features; they are not calibrated probabilities of real-world human speech competence.
-- Detections and predictions are completely label-free; formal benchmark metrics against ground truth are evaluated separately in Phase 5.
+- Detections and predictions are completely label-free; formal benchmark metrics against ground truth are evaluated strictly post-inference.
+- Phase 5: Evaluation metrics computed against synthetic audio fixtures verify algorithmic execution, mathematical correctness, filter responses, and localization boundaries. They do not establish generalizability to naturally recorded human speech. Authentic benchmark claims require licensed or self-recorded human speech corpora.
+- Source-level bootstrap confidence intervals require $\ge 3$ distinct source recordings; smaller cohorts are reported with documented sample-size caveats.
 
 ## Planned phases
 
-5 Evaluation (comparison of predictions against ground truth, quantitative precision/recall/IoU metrics); 6 Explanations and dashboard (evidence-linked natural language summaries, final participant dashboard). See `docs/architecture.md` for the planned interfaces.
+6 Explanations and dashboard (evidence-linked natural language summaries, final participant delivery scorecard). See `docs/architecture.md` for the planned interfaces.
 
 ## Data and audio licensing
 

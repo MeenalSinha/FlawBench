@@ -181,6 +181,35 @@ def build_parser() -> argparse.ArgumentParser:
     )
     det.add_argument("--export", help="export detection predictions summary to JSON file")
 
+    # ---- Phase 5: evaluation engine --------------------------------------------------
+    ev = sub.add_parser("evaluate", help="formal evaluation & benchmarking engine")
+    _add_config_option(ev, is_sub=True)
+    esub = ev.add_subparsers(dest="evaluate_command", required=True, metavar="action")
+
+    ev_run = esub.add_parser("run", help="run evaluation against ground truth")
+    _add_config_option(ev_run, is_sub=True)
+    ev_run.add_argument("--split", default=None, help="evaluation split (test | val | train | all)")
+    ev_run.add_argument("--sample", help="evaluate a single committed sample id")
+    ev_run.add_argument("--run-id", help="custom identifier for this evaluation run")
+    ev_run.add_argument(
+        "--no-controls", action="store_true", help="skip negative identity controls"
+    )
+    ev_run.add_argument(
+        "--bootstrap", action="store_true", default=None, help="enable source-level bootstrap CIs"
+    )
+
+    ev_ls = esub.add_parser("list", help="list saved evaluation runs from manifest")
+    _add_config_option(ev_ls, is_sub=True)
+
+    ev_rep = esub.add_parser("report", help="print or export markdown evaluation report")
+    _add_config_option(ev_rep, is_sub=True)
+    ev_rep.add_argument("--run", required=True, help="evaluation run identifier")
+    ev_rep.add_argument("--output", help="output markdown file (default: stdout)")
+
+    ev_val = esub.add_parser("validate", help="validate stored evaluation artifacts")
+    _add_config_option(ev_val, is_sub=True)
+    ev_val.add_argument("--run", required=True, help="evaluation run identifier")
+
     return parser
 
 
@@ -491,6 +520,96 @@ def _run_detect(args: argparse.Namespace, config: Config) -> int:
     return 2
 
 
+def _run_evaluate(args: argparse.Namespace, config: Config) -> int:
+    from flawbench.evaluation.reports import generate_markdown_report
+    from flawbench.evaluation.runner import EvaluationRunner
+    from flawbench.evaluation.store import EvaluationStore
+    from flawbench.evaluation.validator import EvaluationValidator
+
+    paths = ProjectPaths(config)
+    cmd = args.evaluate_command
+
+    if cmd == "run":
+        split = args.split or config.evaluation.default_split
+        runner = EvaluationRunner(config, paths)
+        include_controls = False if args.no_controls else None
+        report, run_dir = runner.run(
+            split=split,
+            sample_id=args.sample,
+            run_id=args.run_id,
+            include_controls=include_controls,
+            enable_bootstrap=args.bootstrap,
+        )
+        agg = report.aggregate
+        p_str = f"{agg.micro_precision:.3f}" if agg and agg.micro_precision is not None else "N/A"
+        r_str = f"{agg.micro_recall:.3f}" if agg and agg.micro_recall is not None else "N/A"
+        f1_str = f"{agg.micro_f1:.3f}" if agg and agg.micro_f1 is not None else "N/A"
+        iou_str = f"{agg.mean_iou:.3f}" if agg and agg.mean_iou is not None else "N/A"
+
+        print(f"Evaluation completed: run_id='{report.run_id}' (split='{report.split}')")
+        print(
+            f"  Cohort: {report.sample_count} samples across "
+            f"{report.source_count} sources evaluated"
+        )
+        if report.is_synthetic_only:
+            print("  Provenance: synthetic audio fixtures only (not natural human speech)")
+        print(
+            f"  Micro-average: Precision={p_str}, Recall={r_str}, F1={f1_str}, Mean IoU={iou_str}"
+        )
+        print(f"  Artifacts saved to: {run_dir}")
+        return 0
+
+    if cmd == "list":
+        store = EvaluationStore(paths)
+        runs = store.list_runs()
+        print(f"Evaluation runs: {len(runs)}")
+        for r in runs:
+            f1 = f"{r['micro_f1']:.3f}" if r.get("micro_f1") is not None else "N/A"
+            iou = f"{r['mean_iou']:.3f}" if r.get("mean_iou") is not None else "N/A"
+            syn = " [synthetic]" if r.get("is_synthetic_only") else ""
+            print(
+                f"  {r['run_id']}\t(split: {r.get('split')}, "
+                f"samples: {r.get('sample_count')}, "
+                f"F1: {f1}, IoU: {iou}){syn}"
+            )
+        return 0
+
+    if cmd == "report":
+        store = EvaluationStore(paths)
+        report = store.load_evaluation(args.run)
+        run_dir = store.get_run_dir(args.run)
+        md_file = run_dir / "report.md"
+        if md_file.exists():
+            md_content = md_file.read_text(encoding="utf-8")
+        else:
+            md_content = generate_markdown_report(report)
+
+        if args.output:
+            out_p = Path(args.output).resolve()
+            out_p.parent.mkdir(parents=True, exist_ok=True)
+            out_p.write_text(md_content, encoding="utf-8")
+            print(f"Report exported to: {out_p}")
+        else:
+            print(md_content)
+        return 0
+
+    if cmd == "validate":
+        store = EvaluationStore(paths)
+        run_dir = store.get_run_dir(args.run)
+        validator = EvaluationValidator()
+        report, warnings = validator.validate_run_directory(run_dir)
+        total_matches = sum(len(s.matches) for s in report.sample_evaluations)
+        print(
+            f"Evaluation run '{args.run}' is VALID "
+            f"({total_matches} matches, {len(report.per_category)} categories)."
+        )
+        for w in warnings:
+            print(f"  Warning: {w}")
+        return 0
+
+    raise AssertionError(cmd)  # pragma: no cover
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     try:
@@ -509,6 +628,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _run_features(args, config)
         if args.command == "detect":
             return _run_detect(args, config)
+        if args.command == "evaluate":
+            return _run_evaluate(args, config)
         return _run_phase1(args, config)
     except FlawBenchError as exc:
         print(

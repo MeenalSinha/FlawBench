@@ -24,6 +24,7 @@ try:
     )
     from flawbench.ui.dataset_panel import render_dataset_panel
     from flawbench.ui.detection_panel import render_detection_panel
+    from flawbench.ui.evaluation_panel import render_evaluation_panel
     from flawbench.ui.feature_panel import (
         render_feature_result_plots,
         render_features_panel,
@@ -73,6 +74,8 @@ def main() -> None:
     render_features_panel(config, paths, expose_details=expose)
 
     render_detection_panel(config, paths, expose_details=expose)
+
+    render_evaluation_panel(config, paths, expose_details=expose)
 
     st.subheader("Reference audio")
     st.caption(

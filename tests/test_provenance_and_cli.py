@@ -49,8 +49,8 @@ def test_status_hides_paths_unless_requested(config: Config) -> None:
 
 
 def test_phases_one_through_four_are_marked_implemented() -> None:
-    assert [p.number for p in PHASES if p.status == IMPLEMENTED] == [1, 2, 3, 4]
-    assert [p.number for p in PHASES if p.status == PLANNED] == [5, 6]
+    assert [p.number for p in PHASES if p.status == IMPLEMENTED] == [1, 2, 3, 4, 5]
+    assert [p.number for p in PHASES if p.status == PLANNED] == [6]
 
 
 def test_cli_config_check_init_and_errors(

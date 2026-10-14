@@ -171,9 +171,67 @@ flowchart TD
     style LF_IN fill:#ccffcc,stroke:#009900,stroke-width:2px
 ```
 
-### Isolation Guarantees
+## Phase 5: formal evaluation, temporal localization & benchmarking
 
-1. **No Label Flow**: The `DetectionInput` data structure only encapsulates audio waveforms, sample rates, durations, acoustic feature arrays, and DTW alignment curves. Ground-truth annotations (`flaw_type`, `severity`, `output_interval`, `source_interval`) are never loaded or passed into the detection engine.
-2. **Annotation Invariance**: Mutating flaw annotations in `manifest.jsonl` without modifying the audio files produces byte-identical detection outputs.
-3. **Forbidden Key Audit**: `DetectionValidator` scans detection result files for any forbidden ground-truth keys (`ground_truth`, `injected_interval`, `output_interval`, `source_interval`, `severity`, etc.) and rejects contaminated artifacts.
-4. **Canonical Half-Open Representation**: All detected intervals are localized on the variant timeline using integer sample indices `[start_sample, end_sample)` and corresponding seconds `[start_sec, end_sec)`. Reference intervals are recorded separately only when DTW correspondence is unambiguous.
+Phase 5 introduces a reproducible evaluation engine that benchmarks independently generated predictions against ground-truth annotations post-inference.
+
+### Architectural Evaluation Flow
+
+```mermaid
+flowchart TD
+    subgraph Phase 4 Frozen Predictions
+        DET_STORE[DetectionStore: data/detections/detections_manifest.jsonl]
+        DET_STORE --> FREEZE[Freeze Eligible Predictions]
+    end
+
+    subgraph Phase 2 Ground Truth
+        GT_MAN[data/metadata/manifest.jsonl]
+        SPLITS[Source-Level Splits: test, validation, train]
+    end
+
+    subgraph Phase 5 Evaluation Engine
+        FREEZE --> COHORT[EvaluationCohort: join by sample_id & verify audio checksums]
+        GT_MAN --> COHORT
+        SPLITS --> COHORT
+        
+        COHORT --> MATCHER[1-to-1 Bipartite Matcher: Half-Open Sample IoU]
+        MATCHER --> MATCH_TABLE[event_matches.jsonl]
+        
+        MATCH_TABLE --> METRICS[Metrics Calculator]
+        METRICS --> CAT_METRICS[Per-Category P/R/F1 & Boundary MAE]
+        METRICS --> AGG_METRICS[Micro & Macro Averages]
+        METRICS --> LOC_CURVE[Localization-Tolerance Curve: IoU 0.3..0.9]
+        METRICS --> CONF_MAT[Event-Level Confusion Matrix & Error Attribution]
+        
+        COHORT --> CONTROLS[Clean Identity Controls: Ref vs Ref]
+        CONTROLS --> CTRL_METRICS[False-Positive Rate Audit]
+        
+        COHORT --> BOOTSTRAP[Source-Level Cluster Bootstrap 95% CIs]
+        
+        CAT_METRICS --> RUNNER[EvaluationRunner & EvaluationStore]
+        AGG_METRICS --> RUNNER
+        LOC_CURVE --> RUNNER
+        CONF_MAT --> RUNNER
+        CTRL_METRICS --> RUNNER
+        BOOTSTRAP --> RUNNER
+        
+        RUNNER --> ARTIFACTS[outputs: evaluation_report.json, event_matches.jsonl, report.md]
+        RUNNER --> EVAL_MAN[evaluations_manifest.jsonl]
+    end
+```
+
+### Module Responsibilities
+
+| Module | Responsibility |
+|---|---|
+| `schema.py` | Defines `EventMatch`, `CategoryMetrics`, `AggregateMetrics`, `LocalizationPoint`, `ConfusionMatrix`, `ControlMetrics`, `EvaluationReport` |
+| `matching.py` | Half-open integer sample IoU $\frac{|P \cap G|}{|P \cup G|}$; deterministic bipartite greedy 1-to-1 matching |
+| `metrics.py` | Computes precision, recall, F1, boundary error MAE, and localization-tolerance curves |
+| `confusion.py` | Constructs event-level category attribution matrix (correct, confused, missed, spurious) |
+| `controls.py` | Evaluates clean identity self-comparisons to audit false-positive susceptibility |
+| `bootstrap.py` | Source-level cluster bootstrapping for empirical 95% confidence intervals |
+| `inputs.py` | Validates split membership, joins predictions and annotations by `sample_id`, audits checksums |
+| `store.py` | Atomic persistence under `data/evaluations/<run_id>/`, cataloging in `evaluations_manifest.jsonl` |
+| `validator.py` | Audits evaluation reports for metric bounds $[0, 1]$, non-negative counts, and file integrity |
+| `reports.py` | Generates auditable GitHub-flavored markdown benchmark summaries |
+| `runner.py` | Coordinates the full evaluation pipeline and handles single-sample or batch cohorts |

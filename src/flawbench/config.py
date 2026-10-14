@@ -42,6 +42,8 @@ VALID_PITCH_BACKENDS = ("librosa_yin", "librosa_pyin")  # librosa backends for F
 VALID_FEATURE_CACHE_POLICIES = ("skip_if_valid", "always_recompute")
 VALID_DETECTION_CATEGORIES = ("pause_insertion", "tempo_change", "energy_reduction")
 VALID_DETECTION_CACHE_POLICIES = ("skip_if_valid", "always_recompute")
+VALID_EVALUATION_SPLITS = ("test", "validation", "train", "all")
+VALID_ZERO_DENOMINATOR_POLICIES = ("undefined", "zero")
 
 
 DEFAULT_SEVERITY_PROFILES: dict[str, dict[str, dict[str, float]]] = {
@@ -92,7 +94,8 @@ EXTENSION_FORMATS: dict[str, tuple[str, ...]] = {
 class _Field:
     section: str
     key: str
-    kind: str  # "str" | "path" | "int" | "float" | "bool" | "list" | "dict" | "filename"
+    # "str" | "path" | "int" | "float" | "bool" | "list" | "float_list" | "dict" | "filename"
+    kind: str
     default: Any
     env: str
 
@@ -274,6 +277,83 @@ _FIELDS: tuple[_Field, ...] = (
         "4.0",
         "FLAWBENCH_DETECT_SCHEMA_VERSION",
     ),
+    _Field(
+        "evaluation",
+        "default_split",
+        "str",
+        "test",
+        "FLAWBENCH_EVAL_DEFAULT_SPLIT",
+    ),
+    _Field(
+        "evaluation",
+        "matching_iou_threshold",
+        "float",
+        0.5,
+        "FLAWBENCH_EVAL_IOU_THRESH",
+    ),
+    _Field(
+        "evaluation",
+        "localization_iou_thresholds",
+        "float_list",
+        [0.3, 0.5, 0.7, 0.9],
+        "FLAWBENCH_EVAL_LOC_IOU_THRESHOLDS",
+    ),
+    _Field(
+        "evaluation",
+        "require_category_match",
+        "bool",
+        True,
+        "FLAWBENCH_EVAL_REQUIRE_CAT_MATCH",
+    ),
+    _Field(
+        "evaluation",
+        "zero_denominator_policy",
+        "str",
+        "undefined",
+        "FLAWBENCH_EVAL_ZERO_DENOM_POLICY",
+    ),
+    _Field(
+        "evaluation",
+        "bootstrap_replicates",
+        "int",
+        0,
+        "FLAWBENCH_EVAL_BOOTSTRAP_REPLICATES",
+    ),
+    _Field(
+        "evaluation",
+        "bootstrap_seed",
+        "int",
+        1337,
+        "FLAWBENCH_EVAL_BOOTSTRAP_SEED",
+    ),
+    _Field(
+        "evaluation",
+        "include_identity_controls",
+        "bool",
+        True,
+        "FLAWBENCH_EVAL_INCLUDE_CONTROLS",
+    ),
+    _Field(
+        "evaluation",
+        "evaluations_dir",
+        "path",
+        "outputs/evaluations",
+        "FLAWBENCH_EVALUATIONS_DIR",
+    ),
+    _Field(
+        "evaluation",
+        "evaluations_manifest_filename",
+        "filename",
+        "evaluations_manifest.jsonl",
+        "FLAWBENCH_EVAL_MANIFEST_FILENAME",
+    ),
+    _Field(
+        "evaluation",
+        "schema_version",
+        "str",
+        "5.0",
+        "FLAWBENCH_EVAL_SCHEMA_VERSION",
+    ),
 )
 
 
@@ -397,6 +477,23 @@ class DetectionSettings:
 
 
 @dataclass(frozen=True)
+class EvaluationSettings:
+    """Phase 5 evaluation and benchmarking settings."""
+
+    default_split: str
+    matching_iou_threshold: float
+    localization_iou_thresholds: tuple[float, ...]
+    require_category_match: bool
+    zero_denominator_policy: str
+    bootstrap_replicates: int
+    bootstrap_seed: int
+    include_identity_controls: bool
+    evaluations_dir: Path
+    evaluations_manifest_filename: str
+    schema_version: str
+
+
+@dataclass(frozen=True)
 class Config:
     app: AppSettings
     storage: StorageSettings
@@ -406,6 +503,7 @@ class Config:
     dataset: DatasetSettings
     features: FeaturesSettings
     detection: DetectionSettings
+    evaluation: EvaluationSettings
     project_root: Path
     config_file: Path | None
 
@@ -417,6 +515,10 @@ class Config:
         data["features"]["features_dir"] = str(self.features.features_dir)
         data["detection"]["detection_dir"] = str(self.detection.detection_dir)
         data["detection"]["enabled_detectors"] = list(self.detection.enabled_detectors)
+        data["evaluation"]["evaluations_dir"] = str(self.evaluation.evaluations_dir)
+        data["evaluation"]["localization_iou_thresholds"] = list(
+            self.evaluation.localization_iou_thresholds
+        )
         data["project_root"] = str(self.project_root)
         data["config_file"] = str(self.config_file) if self.config_file else None
         return data
@@ -510,6 +612,23 @@ def _coerce(field: _Field, value: Any, source: str) -> Any:
             else:
                 normalized.append(s)
         return normalized
+    if field.kind == "float_list":
+        if isinstance(value, str):
+            raw_items = [part.strip() for part in value.split(",") if part.strip()]
+        elif isinstance(value, (list, tuple)):
+            raw_items = list(value)
+        else:
+            raise bad("a list of numbers or comma-separated string")
+        parsed_floats: list[float] = []
+        for item in raw_items:
+            try:
+                num = float(item)
+                if not math.isfinite(num):
+                    raise bad("a list of finite numbers")
+                parsed_floats.append(num)
+            except (ValueError, TypeError):
+                raise bad("a list of numbers") from None
+        return parsed_floats
     if field.kind == "float":
         if isinstance(value, bool):
             raise bad("a number")
@@ -835,8 +954,59 @@ def _build_detection(dt: dict[str, Any], root: Path) -> DetectionSettings:
     )
 
 
+def _build_evaluation(ev: dict[str, Any], root: Path) -> EvaluationSettings:
+    default_split = str(ev["default_split"]).lower()
+    if default_split not in VALID_EVALUATION_SPLITS:
+        raise ConfigurationError(
+            f"evaluation.default_split must be one of: {', '.join(VALID_EVALUATION_SPLITS)}.",
+            detail=f"got {default_split!r}",
+        )
+    iou_thresh = float(ev["matching_iou_threshold"])
+    if not (0.0 < iou_thresh <= 1.0):
+        raise ConfigurationError(
+            "evaluation.matching_iou_threshold must be in (0.0, 1.0].",
+            detail=f"got {iou_thresh}",
+        )
+    loc_thresholds = [float(x) for x in ev["localization_iou_thresholds"]]
+    if not loc_thresholds:
+        raise ConfigurationError("evaluation.localization_iou_thresholds must not be empty.")
+    for t in loc_thresholds:
+        if not (0.0 < t <= 1.0):
+            raise ConfigurationError(
+                "All thresholds in evaluation.localization_iou_thresholds must be in (0.0, 1.0].",
+                detail=f"got {t}",
+            )
+    zero_denom = str(ev["zero_denominator_policy"]).lower()
+    if zero_denom not in VALID_ZERO_DENOMINATOR_POLICIES:
+        raise ConfigurationError(
+            f"evaluation.zero_denominator_policy must be one of: "
+            f"{', '.join(VALID_ZERO_DENOMINATOR_POLICIES)}.",
+            detail=f"got {zero_denom!r}",
+        )
+    reps = int(ev["bootstrap_replicates"])
+    if reps < 0:
+        raise ConfigurationError(
+            "evaluation.bootstrap_replicates must be non-negative.",
+            detail=f"got {reps}",
+        )
+    evaluations_dir = _resolve_dir(root, ev["evaluations_dir"], "evaluation.evaluations_dir")
+    return EvaluationSettings(
+        default_split=default_split,
+        matching_iou_threshold=iou_thresh,
+        localization_iou_thresholds=tuple(sorted(loc_thresholds)),
+        require_category_match=bool(ev["require_category_match"]),
+        zero_denominator_policy=zero_denom,
+        bootstrap_replicates=reps,
+        bootstrap_seed=int(ev["bootstrap_seed"]),
+        include_identity_controls=bool(ev["include_identity_controls"]),
+        evaluations_dir=evaluations_dir,
+        evaluations_manifest_filename=str(ev["evaluations_manifest_filename"]),
+        schema_version=str(ev["schema_version"]),
+    )
+
+
 def _build(values: dict[str, dict[str, Any]], root: Path, config_file: Path | None) -> Config:
-    app, storage, audio, ui, diag, ds, ft, dt = (
+    app, storage, audio, ui, diag, ds, ft, dt, ev = (
         values["app"],
         values["storage"],
         values["audio"],
@@ -845,6 +1015,7 @@ def _build(values: dict[str, dict[str, Any]], root: Path, config_file: Path | No
         values["dataset"],
         values["features"],
         values["detection"],
+        values["evaluation"],
     )
 
     environment = str(app["environment"]).lower()
@@ -901,6 +1072,7 @@ def _build(values: dict[str, dict[str, Any]], root: Path, config_file: Path | No
     dataset = _build_dataset(ds)
     features = _build_features(ft, root)
     detection = _build_detection(dt, root)
+    evaluation = _build_evaluation(ev, root)
 
     return Config(
         app=AppSettings(str(app["name"]), environment, log_level),
@@ -919,6 +1091,7 @@ def _build(values: dict[str, dict[str, Any]], root: Path, config_file: Path | No
         dataset=dataset,
         features=features,
         detection=detection,
+        evaluation=evaluation,
         project_root=root,
         config_file=config_file,
     )

@@ -17,6 +17,7 @@ def test_derived_directories_follow_configuration(config: Config) -> None:
     assert paths.figures_dir == paths.output_dir / "figures"
     assert paths.reference_dir == config.storage.reference_dir
     assert paths.detection_dir == config.detection.detection_dir
+    assert paths.evaluations_dir == config.evaluation.evaluations_dir
 
 
 def test_ensure_output_directories_creates_nested_writable_dirs_only(config: Config) -> None:
@@ -30,6 +31,7 @@ def test_ensure_output_directories_creates_nested_writable_dirs_only(config: Con
         "figures",
         "features",
         "detections",
+        "evaluations",
     }
     assert not paths.reference_dir.exists()  # input directory is never created
 

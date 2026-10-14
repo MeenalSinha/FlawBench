@@ -98,6 +98,12 @@ class ProjectPaths:
         dt = config.detection
         self.detection_dir: Path = dt.detection_dir
         self.detection_manifest_file: Path = self.detection_dir / dt.detection_manifest_filename
+        # Phase 5: evaluation storage
+        ev = config.evaluation
+        self.evaluations_dir: Path = ev.evaluations_dir
+        self.evaluations_manifest_file: Path = (
+            self.evaluations_dir / ev.evaluations_manifest_filename
+        )
 
     @property
     def dataset_generated_dir(self) -> Path:
@@ -113,6 +119,7 @@ class ProjectPaths:
             "figures": self.figures_dir,
             "features": self.features_dir,
             "detections": self.detection_dir,
+            "evaluations": self.evaluations_dir,
         }
 
     def ensure_output_directories(self) -> list[Path]:

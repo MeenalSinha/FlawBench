@@ -123,3 +123,66 @@ def test_predictions_do_not_contain_ground_truth_leakage() -> None:
         assert key not in data
         assert key not in data["predictions"][0]
         assert key not in data["predictions"][0]["evidence"]
+
+
+def test_evaluation_isolation_preserves_independent_predictions(
+    ds_config: Config,
+    source: SourceRecord,
+) -> None:
+    """Verifies that altering ground-truth labels alters evaluation metrics while detector outputs remain frozen."""
+    from flawbench.dataset.generator import DatasetGenerator
+    from flawbench.dataset.io import read_jsonl, write_jsonl
+    from flawbench.evaluation.runner import EvaluationRunner
+
+    paths = ProjectPaths(ds_config)
+    gen = DatasetGenerator(ds_config)
+    gen_res = gen.generate_variant(
+        source.source_id,
+        "pause_insertion",
+        severity="medium",
+        placement={"mode": "explicit", "at_sec": 2.0},
+    )
+    sample_id = gen_res.record.sample_id
+
+    # 1. Run evaluation with original ground-truth annotations
+    runner = EvaluationRunner(ds_config, paths)
+    report_orig, _ = runner.run(split="all", sample_id=sample_id, include_controls=False)
+
+    # 2. Alter ground truth annotation in manifest (e.g. change flaw_type to tempo_change)
+    rows = read_jsonl(paths.manifest_file, what="manifest")
+    tampered_rows = []
+    for r in rows:
+        if r.get("sample_id") == sample_id:
+            r_copy = dict(r)
+            r_copy["flaw_type"] = "tempo_change"
+            r_copy["annotation"] = dict(r_copy["annotation"])
+            r_copy["annotation"]["flaw_type"] = "tempo_change"
+            tampered_rows.append(r_copy)
+        else:
+            tampered_rows.append(r)
+    write_jsonl(paths.manifest_file, tampered_rows)
+
+    # 3. Re-run evaluation without force_detect: predictions are frozen
+    report_tampered, _ = runner.run(split="all", sample_id=sample_id, include_controls=False)
+
+    # Predictions remain identical
+    det_pipeline = DetectionPipeline(config=ds_config, paths=paths)
+    current_preds = det_pipeline.detect_sample(sample_id, force=False).predictions
+
+    orig_eval = report_orig.sample_evaluations[0]
+    tampered_eval = report_tampered.sample_evaluations[0]
+
+    assert len(orig_eval.matches) > 0
+    assert len(tampered_eval.matches) > 0
+
+    # The detector output is strictly identical
+    assert len(current_preds) == len(orig_eval.matches)
+
+    # But evaluation reflects the changed ground truth (now category mismatch or unmatched)
+    orig_pause_tp = report_orig.per_category["pause_insertion"].tp
+    tampered_pause_tp = report_tampered.per_category["pause_insertion"].tp
+    assert (
+        orig_pause_tp != tampered_pause_tp
+        or report_orig.per_category["tempo_change"].fn
+        != report_tampered.per_category["tempo_change"].fn
+    )

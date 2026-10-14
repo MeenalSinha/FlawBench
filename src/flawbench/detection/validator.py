@@ -75,10 +75,17 @@ class DetectionValidator:
         if pred.ref_start_sec is not None and pred.ref_end_sec is not None:
             if pred.ref_start_sec < 0.0:
                 problems.append(f"ref_start_sec {pred.ref_start_sec} is negative")
-            if pred.ref_start_sec >= pred.ref_end_sec:
-                problems.append(
-                    f"ref_start_sec {pred.ref_start_sec} >= ref_end_sec {pred.ref_end_sec}"
-                )
+            # For pause insertion, reference anchor is instantaneous (ref_start_sec == ref_end_sec)
+            if pred.flaw_type == "pause_insertion":
+                if pred.ref_start_sec > pred.ref_end_sec:
+                    problems.append(
+                        f"ref_start_sec {pred.ref_start_sec} > ref_end_sec {pred.ref_end_sec}"
+                    )
+            else:
+                if pred.ref_start_sec >= pred.ref_end_sec:
+                    problems.append(
+                        f"ref_start_sec {pred.ref_start_sec} >= ref_end_sec {pred.ref_end_sec}"
+                    )
 
         # Evidence strength
         if not (0.0 <= pred.evidence_strength <= 1.0):

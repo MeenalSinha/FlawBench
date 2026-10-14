@@ -106,3 +106,23 @@ class DetectionStoreError(DetectionError):
 
 class DetectionValidationError(DetectionError):
     """Integrity check of saved detection results failed."""
+
+
+class EvaluationError(FlawBenchError):
+    """Base class for Phase 5 formal evaluation and benchmarking failures."""
+
+
+class EvaluationInputError(EvaluationError):
+    """Evaluation cohort resolution or ground-truth/prediction join failed."""
+
+
+class EvaluationMatchingError(EvaluationError):
+    """Bipartite event matching calculation failed."""
+
+
+class EvaluationStoreError(EvaluationError):
+    """Persistence or retrieval of evaluation report artifacts failed."""
+
+
+class EvaluationValidationError(EvaluationError):
+    """Integrity audit of evaluation report failed."""

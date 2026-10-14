@@ -42,7 +42,12 @@ PHASES: tuple[Phase, ...] = (
         "Independent, label-blind detection and temporal localization.",
         IMPLEMENTED,
     ),
-    Phase(5, "Evaluation", "Comparison of predictions against ground truth and metrics.", PLANNED),
+    Phase(
+        5,
+        "Evaluation",
+        "Comparison of predictions against ground truth and temporal IoU benchmarking.",
+        IMPLEMENTED,
+    ),
     Phase(
         6,
         "Explanations and final dashboard",

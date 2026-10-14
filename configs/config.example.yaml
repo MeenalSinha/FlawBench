@@ -103,3 +103,16 @@ detection:
   cache_policy: skip_if_valid
   schema_version: "4.0"
 
+evaluation:
+  default_split: test              # test | validation | train | all
+  matching_iou_threshold: 0.5      # minimum IoU for temporal match credit
+  localization_iou_thresholds: [0.3, 0.5, 0.7, 0.9] # localization curve steps
+  require_category_match: true     # category agreement required for precision/recall
+  zero_denominator_policy: undefined # undefined | zero
+  bootstrap_replicates: 0          # 0 disables bootstrap confidence intervals
+  bootstrap_seed: 1337
+  include_identity_controls: true  # run clean audio false-positive checks
+  evaluations_dir: outputs/evaluations
+  evaluations_manifest_filename: evaluations_manifest.jsonl
+  schema_version: "5.0"
+
