@@ -1,0 +1,20 @@
+# Example generation plan. Copy and edit. Values below are experimental manipulation settings,
+# not claims about human-perceived severity.
+plan_version: 1
+name: example-plan
+seed: 42                 # run seed: required only because one entry uses random placement
+variants:
+  - source: "*"          # every registered source, or a specific source id
+    flaw: pause_insertion
+    severity: medium
+    placement: {mode: explicit, at_sec: 3.0}
+  - source: "*"
+    flaw: tempo_change
+    severity: low
+    placement: {mode: explicit, start_sec: 2.0}
+  - source: "*"
+    flaw: energy_reduction
+    severity: high
+    placement: {mode: random}
+    count: 2             # replicates, each with its own derived seed
+    parameters: {segment_sec: 1.5}   # optional override; the label becomes "custom"

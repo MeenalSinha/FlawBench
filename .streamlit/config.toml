@@ -1,0 +1,15 @@
+[theme]
+base = "light"
+primaryColor = "#1F4E79"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F3F6FA"
+textColor = "#1B2430"
+font = "sans serif"
+
+[server]
+# Transport-level ceiling enforced by Streamlit itself (MB). FlawBench enforces its own,
+# configurable limit (audio.max_upload_mb) in code; keep this value >= that limit.
+maxUploadSize = 200
+
+[browser]
+gatherUsageStats = false

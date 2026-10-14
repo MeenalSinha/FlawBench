@@ -1,0 +1,71 @@
+# Copy to configs/config.yaml (git-ignored) and edit. Every key is optional.
+# Relative paths are resolved against the project root, not the working directory.
+# Precedence: runtime overrides > environment variables > this file > defaults.
+
+app:
+  name: FlawBench
+  environment: development      # development | production
+  log_level: INFO               # DEBUG | INFO | WARNING | ERROR | CRITICAL
+
+storage:
+  reference_dir: data/reference # read-only input location
+  generated_dir: data/generated # writable
+  metadata_dir: data/metadata   # writable
+  output_dir: outputs           # writable; reports/ and figures/ live beneath it
+
+audio:
+  allowed_extensions: [".wav", ".flac", ".ogg", ".mp3"]
+  max_upload_mb: 50
+  min_sample_rate_hz: 8000
+  max_channels: 2
+  reject_non_finite_samples: true
+
+ui:
+  page_title: "FlawBench - Speech Flaw Analysis"
+  layout: centered              # centered | wide
+  show_roadmap: true
+
+diagnostics:
+  detailed_logging: false       # include tracebacks in logs
+  expose_error_details: false   # show technical detail in the UI (rejected in production)
+
+dataset:
+  dataset_id: flawbench-v1          # namespace for generated audio and sample ids
+  # Metadata files live inside storage.metadata_dir (plain file names only).
+  sources_filename: sources.jsonl
+  manifest_filename: manifest.jsonl
+  runs_filename: runs.jsonl
+  splits_filename: splits.json
+  copy_reference: false             # true: `register-reference` may copy files into reference_dir
+  allow_overwrite: false            # true: regeneration may replace an existing sample (history kept)
+  output_subtype: FLOAT             # FLOAT (lossless for the float32 pipeline) | PCM_16 | PCM_24
+  placement_margin_sec: 0.25        # random placement stays this far from the recording edges
+  max_output_seconds: 600.0         # refuse to generate longer recordings
+  max_variants_per_run: 1000
+  duration_tolerance_sec: 0.001     # validator tolerance between recorded and actual duration
+  split_seed: 1337
+  split_ratios: {train: 0.7, validation: 0.15, test: 0.15}
+  # Experimental manipulation strengths, NOT human-rated severities. Mapping settings in a file
+  # (or in the environment) replace the default mapping wholesale.
+  severity_profiles:
+    pause_insertion:
+      low:    {duration_sec: 0.5}
+      medium: {duration_sec: 1.0}
+      high:   {duration_sec: 2.0}
+    tempo_change:                   # rate < 1 slows the segment, > 1 speeds it up
+      low:    {rate: 0.85, segment_sec: 2.0}
+      medium: {rate: 0.7,  segment_sec: 2.0}
+      high:   {rate: 0.5,  segment_sec: 2.0}
+    energy_reduction:               # negative gain in dB applied to the segment
+      low:    {gain_db: -6.0,  segment_sec: 2.0}
+      medium: {gain_db: -12.0, segment_sec: 2.0}
+      high:   {gain_db: -24.0, segment_sec: 2.0}
+  parameter_bounds:
+    pause_insertion:
+      duration_sec: {min: 0.05, max: 30.0}
+    tempo_change:
+      rate: {min: 0.25, max: 4.0}
+      segment_sec: {min: 0.25, max: 30.0}
+    energy_reduction:
+      gain_db: {min: -60.0, max: -0.5}
+      segment_sec: {min: 0.05, max: 30.0}

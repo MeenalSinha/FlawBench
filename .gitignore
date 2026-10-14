@@ -1,0 +1,40 @@
+# Environments and secrets
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+configs/config.yaml
+configs/config.local.yaml
+
+# Python caches and build artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Runtime data (generated at runtime; never committed)
+data/generated/
+data/metadata/
+data/features/
+data/tmp/
+outputs/
+*.tmp
+
+
+# Audio is not committed by default: check licensing first (see data/reference/README.md)
+data/reference/*
+!data/reference/README.md
+
+# Editors and OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

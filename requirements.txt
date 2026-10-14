@@ -1,0 +1,4 @@
+# Single source of truth for dependencies is pyproject.toml.
+# This file exists so that `pip install -r requirements.txt` performs the
+# documented development installation (package in editable mode + dev extras).
+-e .[dev]
