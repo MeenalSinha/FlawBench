@@ -1,6 +1,6 @@
-# FlawBench
+# FlawBench — Evidence-Based Speech Flaw Analysis
 
-Evidence-based speech flaw analysis with exact ground truth.
+**v0.1.0 — Release Candidate 1**  
 Multimodal AI Hackathon 2026, Track C: Contrastive Speech Analytics and Temporal Flaw Grounding.
 
 ## Concept
@@ -68,12 +68,28 @@ Planned flaw categories: excessive pauses, local pacing deviations, local energy
 | Timeline of candidate intervals, reference alignment plots, and interval-specific audio excerpts | Implemented (Phase 6) |
 | Exportable participant reports (JSON, Markdown, HTML, CSV) rendered from the saved analysis | Implemented (Phase 6) |
 | Multi-page dashboard separating participant analysis, Evaluation Lab and technical panels | Implemented (Phase 6) |
-| Detector v5 (windowed tempo slope, level-invariant alignment, silence/voicing guards), explicit F0-correlation policy, deterministic prediction IDs, QA test suites | In progress (Phase 7, synthetic-fixture validation only) |
+| Detector v5 (windowed tempo slope, level-invariant alignment, silence/voicing guards), explicit F0-correlation policy, deterministic prediction IDs, QA test suites (**416 automated tests**) | Implemented (Phase 7, synthetic-fixture validation only) |
+| Release-candidate verification CLI (`python -m flawbench release-check`), demo runbook & script, reproducible packaging, comprehensive documentation, licensing & AI disclosure | Implemented (Phase 8) |
 | Optional LLM wording layer, pitch-related detection, word-level alignment, overall quality score | Not implemented |
 
 FlawBench extracts real acoustic features, computes differential DTW alignments, independently detects speech delivery flaws without accessing ground-truth labels, and rigorously benchmarks predicted intervals against known truth using deterministic one-to-one temporal IoU matching.
 
-## FlawBench End-to-End Workflow (Phases 2, 3, 4 & 5)
+## Quick Start
+
+```powershell
+# Windows PowerShell — create environment and install
+py -m venv .venv ; .venv\Scripts\Activate.ps1
+pip install -e ".[dev]"
+
+# Verify the release candidate
+python -m flawbench check
+python -m flawbench release-check
+
+# Launch the interactive dashboard
+streamlit run app.py
+```
+
+## End-to-End Workflow (Phases 2–5)
 
 ```bash
 # 1. Register a recording you are allowed to modify (rights must be confirmed)
@@ -169,14 +185,19 @@ FlawBench/
     evaluation/               Phase 5 engine: 1-to-1 matching, metrics, confusion, controls, store
     explainability/           Phase 6 evidence facts, deterministic templates, validator, reports
     participant/              Phase 6 analysis workflow, playback excerpts, transcript check
-    __main__.py               CLI: config, check, dataset, features, detect, evaluate
-  tests/                      pytest suite
+    release.py                Phase 8 release-validation engine
+    __main__.py               CLI: config, check, init, provenance, dataset, features,
+                              detect, evaluate, explain, release-check
+  tests/                      pytest suite (416 tests; 1 POSIX-only skip)
   data/reference/             Reference recordings (contents git-ignored)
   configs/plan.example.yaml   Example generation plan
   docs/                       architecture.md, development.md, dataset_schema.md,
                               detection_methodology.md, detection_schema.md,
                               evaluation_methodology.md, evaluation_schema.md,
-                              phase_1_completion.md through phase_5_completion.md
+                              explanation_methodology.md, quality_assurance.md,
+                              phase_1_completion.md through phase_7_validation_report.md,
+                              demo_runbook.md, release_notes.md,
+                              licensing_and_disclosure.md, phase_8_release_report.md
 ```
 
 `data/generated/`, `data/metadata/` (manifests), and `outputs/{reports,figures,exports}/` are created at runtime
@@ -207,17 +228,29 @@ configuration file, application defaults. Defaults are defined once, in `src/fla
 ## Run
 
 ```bash
+# Unix-like
 streamlit run app.py
-python -m flawbench check      # real status of config, directories, audio decoder
-python -m flawbench init       # create the writable directories
+python -m flawbench check           # real status of config, directories, audio decoder
+python -m flawbench init            # create the writable directories
+python -m flawbench release-check   # comprehensive release candidate verification
+python -m flawbench release-check --run-tests   # include full test suite execution
+```
+
+```powershell
+# Windows PowerShell
+streamlit run app.py
+python -m flawbench check
+python -m flawbench release-check
 ```
 
 ## Test
 
 ```bash
-pytest                          # full suite
+pytest                          # full suite (416 tests; 1 POSIX-only skip)
 pytest --cov=flawbench          # with coverage
-ruff check src tests app.py && mypy
+ruff check src tests app.py     # lint
+ruff format --check src tests app.py  # format
+mypy                            # strict type-check (72 source files)
 ```
 
 ## Known limitations
@@ -244,9 +277,9 @@ ruff check src tests app.py && mypy
 
 - Phase 6: Explanations are deterministic templates over detector evidence. Only pause, tempo and energy-reduction deviations are analyzed; pitch and other delivery aspects are not. No audio-text alignment backend exists, so no word-level references are given. Phase 7 investigated the Phase 6 tempo-recall and energy/pause false-positive weaknesses and changed the detectors (detector version 5.0); results are in `docs/phase_7_validation_report.md`. They were measured on synthetic harmonic-tone fixtures only: no natural-speech or manually annotated validation exists, so no accuracy claim about human speech is made. The mildest tempo setting (rate 0.85, equal to the configured 0.15 minimum deviation) is not reliably detected, and a tempo candidate can appear next to a long pause edge. Source types are declared at registration and are not verified; the registry has no synthetic type, so synthetic fixtures are not flagged as synthetic. See `docs/quality_assurance.md`. Source types are declared at registration and are not verified.
 
-## Planned phases
+## Planned extensions
 
-6 Explanations and dashboard (evidence-linked natural language summaries, final participant delivery scorecard). See `docs/architecture.md` for the planned interfaces.
+Pitch-variation detection, word-level audio-text alignment, pronunciation and intonation coaching, calibrated evidence scores, natural-speech validation corpus.
 
 ## Data and audio licensing
 

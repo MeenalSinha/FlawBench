@@ -60,8 +60,14 @@ PHASES: tuple[Phase, ...] = (
         7,
         "Quality assurance and reliability hardening",
         "Detector-reliability fixes, numerical-stability policy, regression, robustness and "
-        "security tests, and release-candidate validation on synthetic fixtures. Natural-speech "
-        "validation and real-browser testing are not done.",
-        IN_PROGRESS,
+        "security tests, and release-candidate validation on synthetic fixtures.",
+        IMPLEMENTED,
+    ),
+    Phase(
+        8,
+        "Release preparation, demo engineering, packaging, and handover",
+        "Release candidate verification, demo runbook and script, reproducible packaging, "
+        "comprehensive documentation, licensing/AI disclosure, and handover readiness.",
+        IMPLEMENTED,
     ),
 )

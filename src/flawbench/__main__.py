@@ -231,7 +231,38 @@ def build_parser() -> argparse.ArgumentParser:
     x_up.add_argument("--transcript", help="optional participant transcript file")
     x_up.add_argument("--export", action="store_true", help="write report files")
 
+    rel = sub.add_parser(
+        "release-check", help="execute comprehensive release candidate verification checklist"
+    )
+    _add_config_option(rel, is_sub=True)
+    rel.add_argument("--run-tests", action="store_true", help="run full automated test suite")
+    rel.add_argument("--json", action="store_true", help="output report as JSON")
+    rel.add_argument("--output", help="write validation report to specified file path")
+
     return parser
+
+
+def _run_release_check(args: argparse.Namespace, config: Config) -> int:
+    from flawbench.release import run_release_validation
+
+    paths = ProjectPaths(config)
+    report = run_release_validation(config, paths, run_tests=getattr(args, "run_tests", False))
+
+    if getattr(args, "json", False):
+        out = json.dumps(report.to_dict(), indent=2)
+    else:
+        out = report.render_markdown()
+
+    out_file = getattr(args, "output", None)
+    if out_file:
+        out_path = Path(out_file)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(out, encoding="utf-8")
+        print(f"Release validation report written to: {out_path}")
+    else:
+        print(out)
+
+    return 0 if report.is_ready else 1
 
 
 def _run_explain(args: argparse.Namespace, config: Config) -> int:
@@ -691,6 +722,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _run_evaluate(args, config)
         if args.command == "explain":
             return _run_explain(args, config)
+        if args.command == "release-check":
+            return _run_release_check(args, config)
         return _run_phase1(args, config)
     except FlawBenchError as exc:
         print(

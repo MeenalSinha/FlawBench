@@ -49,11 +49,10 @@ def test_status_hides_paths_unless_requested(config: Config) -> None:
 
 
 def test_roadmap_statuses_match_the_verified_state() -> None:
-    # Phase 6 was PLANNED here until its acceptance criteria were verified.
-    assert [p.number for p in PHASES if p.status == IMPLEMENTED] == [1, 2, 3, 4, 5, 6]
+    # Phases 1-8 are implemented and verified
+    assert [p.number for p in PHASES if p.status == IMPLEMENTED] == [1, 2, 3, 4, 5, 6, 7, 8]
     assert [p.number for p in PHASES if p.status == PLANNED] == []
-    # Phase 7 stays in progress: natural-speech and real-browser validation have not been run.
-    assert [p.number for p in PHASES if p.status == IN_PROGRESS] == [7]
+    assert [p.number for p in PHASES if p.status == IN_PROGRESS] == []
 
 
 def test_cli_config_check_init_and_errors(
@@ -70,3 +69,20 @@ def test_cli_config_check_init_and_errors(
     monkeypatch.setenv("FLAWBENCH_LOG_LEVEL", "LOUD")
     assert main(["check"]) == 2
     assert "Configuration error" in capsys.readouterr().err
+
+
+def test_cli_release_check(
+    project_root: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("FLAWBENCH_PROJECT_ROOT", str(project_root))
+    assert main(["init"]) == 0
+    (project_root / "data/reference").mkdir(parents=True, exist_ok=True)
+    (project_root / "app.py").write_text("import streamlit as st\nst.title('FlawBench')\n")
+    capsys.readouterr()
+    res = main(["release-check", "--json"])
+    out = capsys.readouterr().out
+    assert res == 0
+    data = json.loads(out)
+    assert data["is_ready"] is True
+    assert data["version"] == "0.1.0"
+    assert data["passed_count"] >= 20
