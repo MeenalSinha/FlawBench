@@ -72,7 +72,7 @@ Rather than relying on subjective human scores or ungrounded generative language
 - Interactive multi-page Streamlit dashboard (`app.py`).
 
 ### Phase 7 — Quality Assurance & Reliability Hardening
-- Comprehensive regression test suite consisting of **415 automated tests** across all subsystems.
+- Comprehensive regression test suite consisting of **416 automated tests** across all subsystems.
 - Detector reliability hardening:
   - Windowed tempo slope replacing quantized path-point differentiation.
   - Voicing and silence guards preventing energy/pause cross-category false alarms.

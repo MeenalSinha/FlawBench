@@ -136,7 +136,7 @@ python -m flawbench evaluate run --split all --run-id demo_run
 - **Narration**:
   > "In summary, FlawBench bridges speech coaching and objective ML benchmarking. To maintain academic and scientific integrity, we explicitly disclose: our benchmarks were measured on controlled acoustic fixtures; natural human speech validation requires future corpora with verified multi-annotator agreement; and detector evidence scores are heuristic acoustic deviations, not calibrated probabilities.
   >
-  > FlawBench is release-ready, fully tested with 415 automated tests, and packaged with reproducible CLI workflows."
+  > FlawBench is release-ready, fully tested with 416 automated tests, and packaged with reproducible CLI workflows."
 
 ---
 
