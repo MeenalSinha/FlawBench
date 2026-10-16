@@ -10,6 +10,7 @@ from typing import Any
 
 from flawbench import __version__
 from flawbench.config import VALID_DETECTION_CATEGORIES, Config
+from flawbench.detection.engine import DetectionEngine
 from flawbench.evaluation.bootstrap import compute_source_level_bootstrap
 from flawbench.evaluation.confusion import build_confusion_matrix
 from flawbench.evaluation.controls import evaluate_identity_controls
@@ -53,6 +54,7 @@ class EvaluationRunner:
         run_id: str | None = None,
         include_controls: bool | None = None,
         enable_bootstrap: bool | None = None,
+        overwrite: bool = False,
     ) -> tuple[EvaluationReport, Path]:
         """Execute a formal evaluation run on a dataset split or single sample."""
         eval_cfg = self.config.evaluation
@@ -61,6 +63,12 @@ class EvaluationRunner:
         if run_id is None:
             prefix = f"eval_{split}" if sample_id is None else f"eval_{sample_id}"
             run_id = f"{prefix}_{timestamp}"
+            # Auto-generated identifiers must be unique: never reuse (and so never overwrite) an
+            # existing run that happens to share the same second.
+            suffix = 1
+            while (self.paths.evaluations_dir / run_id).exists():
+                suffix += 1
+                run_id = f"{prefix}_{timestamp}_{suffix}"
 
         # 1. Resolve cohort
         cohort = EvaluationCohort.resolve_cohort(
@@ -146,7 +154,9 @@ class EvaluationRunner:
                 policy=eval_cfg.zero_denominator_policy,
             )
 
-        det_fingerprint = _fingerprint(self.config.detection.__dict__)
+        # Same path-independent fingerprint the detection cache uses (includes detector version).
+        engine = DetectionEngine(self.config.detection)
+        det_fingerprint = engine.config_fingerprint()
         eval_fingerprint = _fingerprint(self.config.evaluation.__dict__)
 
         # 9. Build EvaluationReport
@@ -166,11 +176,14 @@ class EvaluationRunner:
             bootstrap_ci=bootstrap_data,
             sample_evaluations=sample_evaluations,
             created_at=datetime.now(timezone.utc).isoformat(),
-            detector_version=__version__,
+            detector_version=engine.detector_version,
             detector_config_fingerprint=det_fingerprint,
             eval_config_fingerprint=eval_fingerprint,
             is_synthetic_only=cohort.is_synthetic_only,
-            metadata={"matching_iou_threshold": eval_cfg.matching_iou_threshold},
+            metadata={
+                "matching_iou_threshold": eval_cfg.matching_iou_threshold,
+                "flawbench_version": __version__,
+            },
         )
 
         # 10. Validate report
@@ -182,7 +195,7 @@ class EvaluationRunner:
             report=report,
             markdown_report=markdown,
             all_matches=all_matches,
-            overwrite=True,
+            overwrite=overwrite,
         )
 
         return report, run_dir

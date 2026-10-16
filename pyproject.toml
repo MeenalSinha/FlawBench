@@ -14,8 +14,10 @@ dependencies = [
     "soundfile>=0.12.1,<1",
     "PyYAML>=6.0,<7",
     "audiotsm>=0.1.2,<1",
-    "streamlit>=1.40,<2",
+    "streamlit>=1.56.0,<2",
     "librosa>=0.10,<2",
+    "plotly>=5.20,<7",
+    "pandas>=2.0,<4",
 ]
 
 [project.optional-dependencies]
@@ -38,6 +40,7 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 addopts = "-ra --strict-markers"
 
 [tool.ruff]

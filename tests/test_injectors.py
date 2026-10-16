@@ -5,9 +5,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from conftest import SYN_RATE, synthetic_signal
 from flawbench.dataset import injectors
 from flawbench.exceptions import InjectionError
+from tests.conftest import SYN_RATE, synthetic_signal
 
 SR = SYN_RATE
 

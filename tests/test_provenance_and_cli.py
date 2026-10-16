@@ -9,7 +9,7 @@ from flawbench.__main__ import main
 from flawbench.config import Config, load_config
 from flawbench.paths import ProjectPaths
 from flawbench.provenance import build_provenance, config_fingerprint
-from flawbench.roadmap import IMPLEMENTED, PHASES, PLANNED
+from flawbench.roadmap import IMPLEMENTED, IN_PROGRESS, PHASES, PLANNED
 from flawbench.status import collect_status
 
 
@@ -48,9 +48,12 @@ def test_status_hides_paths_unless_requested(config: Config) -> None:
     assert str(config.project_root) in shown
 
 
-def test_phases_one_through_four_are_marked_implemented() -> None:
-    assert [p.number for p in PHASES if p.status == IMPLEMENTED] == [1, 2, 3, 4, 5]
-    assert [p.number for p in PHASES if p.status == PLANNED] == [6]
+def test_roadmap_statuses_match_the_verified_state() -> None:
+    # Phase 6 was PLANNED here until its acceptance criteria were verified.
+    assert [p.number for p in PHASES if p.status == IMPLEMENTED] == [1, 2, 3, 4, 5, 6]
+    assert [p.number for p in PHASES if p.status == PLANNED] == []
+    # Phase 7 stays in progress: natural-speech and real-browser validation have not been run.
+    assert [p.number for p in PHASES if p.status == IN_PROGRESS] == [7]
 
 
 def test_cli_config_check_init_and_errors(

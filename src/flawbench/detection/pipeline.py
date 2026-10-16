@@ -85,7 +85,9 @@ class DetectionPipeline:
                 return cached
 
         # Build label-free input
-        inp = build_detection_input(sample_id, self.feature_pipeline, force_extract=force)
+        inp = build_detection_input(
+            sample_id, self.feature_pipeline, force_extract=force, settings=self.config.detection
+        )
 
         # Run inference
         result = self.engine.detect(inp)

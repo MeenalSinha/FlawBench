@@ -18,6 +18,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import warnings
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -325,6 +326,27 @@ def _compute_summary_stats(
     return stats
 
 
+#: Candidate mel-band counts, largest first. 128 is librosa's default and is kept wherever the
+#: FFT resolution supports it, so results at those sample rates are unchanged.
+_MEL_BAND_CANDIDATES = (128, 96, 64, 48, 40, 32, 26, 20)
+
+
+def mel_bands_for(sr: int, n_fft: int) -> int:
+    """Largest candidate mel-band count whose filters are all non-empty at this resolution.
+
+    At low sample rates the analysis window (``sr * frame_ms``) has too few FFT bins for 128 mel
+    bands, which leaves empty (always-zero) filters. Those are detected here rather than
+    letting the library warn and silently produce degenerate coefficients.
+    """
+    for n_mels in _MEL_BAND_CANDIDATES:
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            librosa.filters.mel(sr=sr, n_fft=n_fft, n_mels=n_mels)
+        if not caught:
+            return n_mels
+    return _MEL_BAND_CANDIDATES[-1]
+
+
 def extract_features(
     audio: LoadedAudio | NDArray[Any],
     sample_rate: int | None = None,
@@ -471,6 +493,7 @@ def extract_features(
         y=y_padded,
         sr=sr,
         n_mfcc=feat_cfg.n_mfcc,
+        n_mels=mel_bands_for(sr, frame_length),
         n_fft=frame_length,
         hop_length=hop_length,
         center=False,

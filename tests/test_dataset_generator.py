@@ -6,7 +6,6 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from conftest import write_fixture
 from flawbench.audio.loader import load_audio
 from flawbench.config import Config, load_config
 from flawbench.dataset.generator import (
@@ -20,6 +19,7 @@ from flawbench.dataset.registry import SourceRegistry
 from flawbench.dataset.schema import SampleRecord, SourceRecord
 from flawbench.dataset.validator import validate_dataset
 from flawbench.exceptions import DatasetError, GenerationError, InjectionError, RegistryError
+from tests.conftest import write_fixture
 
 EXPLICIT = {"mode": "explicit"}
 

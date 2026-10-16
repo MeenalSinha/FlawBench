@@ -42,8 +42,27 @@ VALID_PITCH_BACKENDS = ("librosa_yin", "librosa_pyin")  # librosa backends for F
 VALID_FEATURE_CACHE_POLICIES = ("skip_if_valid", "always_recompute")
 VALID_DETECTION_CATEGORIES = ("pause_insertion", "tempo_change", "energy_reduction")
 VALID_DETECTION_CACHE_POLICIES = ("skip_if_valid", "always_recompute")
+VALID_ALIGNMENT_METRICS = ("euclidean", "cosine")
+#: Single source for the alignment defaults (also used where no settings object is available).
+DEFAULT_ALIGNMENT_METRIC = "euclidean"
+DEFAULT_ALIGNMENT_EXCLUDE_ENERGY_COEFFICIENT = True
 VALID_EVALUATION_SPLITS = ("test", "validation", "train", "all")
 VALID_ZERO_DENOMINATOR_POLICIES = ("undefined", "zero")
+VALID_UI_PAGES = (
+    "overview",
+    "analyze",
+    "timeline",
+    "evidence",
+    "guidance",
+    "evaluation",
+    "technical",
+)
+VALID_ANALYSIS_MODES = ("registered_variant", "uploaded_participant")
+VALID_VERBOSITY = ("concise", "standard", "detailed")
+VALID_SORT_POLICIES = ("chronological", "evidence_strength")
+VALID_UPLOAD_PERSISTENCE = ("transient_only", "explicit_registration")
+VALID_EXPORT_FORMATS = ("markdown", "html", "json", "csv")
+VALID_TRANSCRIPT_FORMATS = (".txt", ".md")
 
 
 DEFAULT_SEVERITY_PROFILES: dict[str, dict[str, dict[str, float]]] = {
@@ -120,7 +139,7 @@ _FIELDS: tuple[_Field, ...] = (
     _Field("audio", "max_channels", "int", 2, "FLAWBENCH_MAX_CHANNELS"),
     _Field("audio", "reject_non_finite_samples", "bool", True, "FLAWBENCH_REJECT_NON_FINITE"),
     _Field("ui", "page_title", "str", "FlawBench - Speech Flaw Analysis", "FLAWBENCH_PAGE_TITLE"),
-    _Field("ui", "layout", "str", "centered", "FLAWBENCH_LAYOUT"),
+    _Field("ui", "layout", "str", "wide", "FLAWBENCH_LAYOUT"),
     _Field("ui", "show_roadmap", "bool", True, "FLAWBENCH_SHOW_ROADMAP"),
     _Field("diagnostics", "detailed_logging", "bool", False, "FLAWBENCH_DETAILED_LOGGING"),
     _Field("diagnostics", "expose_error_details", "bool", False, "FLAWBENCH_EXPOSE_ERROR_DETAILS"),
@@ -220,6 +239,41 @@ _FIELDS: tuple[_Field, ...] = (
         "float",
         0.25,
         "FLAWBENCH_DETECT_TEMPO_MIN_SEC",
+    ),
+    _Field(
+        "detection",
+        "alignment_metric",
+        "str",
+        "euclidean",
+        "FLAWBENCH_DETECT_ALIGN_METRIC",
+    ),
+    _Field(
+        "detection",
+        "alignment_exclude_energy_coefficient",
+        "bool",
+        True,
+        "FLAWBENCH_DETECT_ALIGN_NO_C0",
+    ),
+    _Field(
+        "detection",
+        "tempo_slope_window_sec",
+        "float",
+        0.5,
+        "FLAWBENCH_DETECT_TEMPO_WINDOW_SEC",
+    ),
+    _Field(
+        "detection",
+        "tempo_max_inactive_fraction",
+        "float",
+        0.2,
+        "FLAWBENCH_DETECT_TEMPO_MAX_INACTIVE",
+    ),
+    _Field(
+        "detection",
+        "pause_max_voiced_fraction",
+        "float",
+        0.25,
+        "FLAWBENCH_DETECT_PAUSE_MAX_VOICED",
     ),
     _Field(
         "detection",
@@ -354,6 +408,88 @@ _FIELDS: tuple[_Field, ...] = (
         "5.0",
         "FLAWBENCH_EVAL_SCHEMA_VERSION",
     ),
+    # ------------------------------------------------------------ Phase 6: explanations & UI
+    _Field("explanation", "default_page", "str", "overview", "FLAWBENCH_EXPLAIN_DEFAULT_PAGE"),
+    _Field(
+        "explanation",
+        "analysis_modes",
+        "list",
+        ["registered_variant", "uploaded_participant"],
+        "FLAWBENCH_EXPLAIN_ANALYSIS_MODES",
+    ),
+    _Field("explanation", "verbosity", "str", "standard", "FLAWBENCH_EXPLAIN_VERBOSITY"),
+    _Field("explanation", "sort_policy", "str", "chronological", "FLAWBENCH_EXPLAIN_SORT_POLICY"),
+    _Field(
+        "explanation",
+        "playback_context_sec",
+        "float",
+        1.0,
+        "FLAWBENCH_EXPLAIN_PLAYBACK_CONTEXT_SEC",
+    ),
+    _Field("explanation", "max_excerpt_sec", "float", 30.0, "FLAWBENCH_EXPLAIN_MAX_EXCERPT_SEC"),
+    _Field(
+        "explanation",
+        "show_technical_evidence",
+        "bool",
+        True,
+        "FLAWBENCH_EXPLAIN_SHOW_TECHNICAL_EVIDENCE",
+    ),
+    _Field(
+        "explanation",
+        "transcript_formats",
+        "list",
+        [".txt"],
+        "FLAWBENCH_EXPLAIN_TRANSCRIPT_FORMATS",
+    ),
+    _Field(
+        "explanation",
+        "transcript_similarity_warning",
+        "float",
+        0.8,
+        "FLAWBENCH_EXPLAIN_TRANSCRIPT_SIMILARITY_WARNING",
+    ),
+    _Field(
+        "explanation",
+        "alignment_duration_ratio_warning",
+        "float",
+        2.0,
+        "FLAWBENCH_EXPLAIN_ALIGNMENT_DURATION_RATIO_WARNING",
+    ),
+    _Field(
+        "explanation",
+        "upload_persistence",
+        "str",
+        "explicit_registration",
+        "FLAWBENCH_EXPLAIN_UPLOAD_PERSISTENCE",
+    ),
+    _Field(
+        "explanation",
+        "reports_dir",
+        "path",
+        "outputs/participant_reports",
+        "FLAWBENCH_EXPLAIN_REPORTS_DIR",
+    ),
+    _Field(
+        "explanation",
+        "export_formats",
+        "list",
+        ["markdown", "html", "json", "csv"],
+        "FLAWBENCH_EXPLAIN_EXPORT_FORMATS",
+    ),
+    _Field(
+        "explanation",
+        "save_reports_automatically",
+        "bool",
+        False,
+        "FLAWBENCH_EXPLAIN_SAVE_REPORTS_AUTOMATICALLY",
+    ),
+    _Field(
+        "explanation",
+        "show_benchmark_context",
+        "bool",
+        True,
+        "FLAWBENCH_EXPLAIN_SHOW_BENCHMARK_CONTEXT",
+    ),
 )
 
 
@@ -466,6 +602,11 @@ class DetectionSettings:
     pause_min_difference_sec: float
     tempo_ratio_min_deviation: float
     tempo_min_duration_sec: float
+    alignment_metric: str
+    alignment_exclude_energy_coefficient: bool
+    tempo_slope_window_sec: float
+    tempo_max_inactive_fraction: float
+    pause_max_voiced_fraction: float
     energy_reduction_threshold_db: float
     energy_reduction_min_duration_sec: float
     merge_gap_sec: float
@@ -494,6 +635,27 @@ class EvaluationSettings:
 
 
 @dataclass(frozen=True)
+class ExplanationSettings:
+    """Phase 6 participant-analysis, explanation and report settings."""
+
+    default_page: str
+    analysis_modes: tuple[str, ...]
+    verbosity: str
+    sort_policy: str
+    playback_context_sec: float
+    max_excerpt_sec: float
+    show_technical_evidence: bool
+    transcript_formats: tuple[str, ...]
+    transcript_similarity_warning: float
+    alignment_duration_ratio_warning: float
+    upload_persistence: str
+    reports_dir: Path
+    export_formats: tuple[str, ...]
+    save_reports_automatically: bool
+    show_benchmark_context: bool
+
+
+@dataclass(frozen=True)
 class Config:
     app: AppSettings
     storage: StorageSettings
@@ -504,6 +666,7 @@ class Config:
     features: FeaturesSettings
     detection: DetectionSettings
     evaluation: EvaluationSettings
+    explanation: ExplanationSettings
     project_root: Path
     config_file: Path | None
 
@@ -519,6 +682,10 @@ class Config:
         data["evaluation"]["localization_iou_thresholds"] = list(
             self.evaluation.localization_iou_thresholds
         )
+        data["explanation"]["analysis_modes"] = list(self.explanation.analysis_modes)
+        data["explanation"]["transcript_formats"] = list(self.explanation.transcript_formats)
+        data["explanation"]["export_formats"] = list(self.explanation.export_formats)
+        data["explanation"]["reports_dir"] = str(self.explanation.reports_dir)
         data["project_root"] = str(self.project_root)
         data["config_file"] = str(self.config_file) if self.config_file else None
         return data
@@ -909,6 +1076,26 @@ def _build_detection(dt: dict[str, Any], root: Path) -> DetectionSettings:
             "detection.tempo_min_duration_sec must be positive.",
             detail=f"got {dt['tempo_min_duration_sec']}",
         )
+    if dt["alignment_metric"] not in VALID_ALIGNMENT_METRICS:
+        raise ConfigurationError(
+            f"detection.alignment_metric must be one of: {', '.join(VALID_ALIGNMENT_METRICS)}.",
+            detail=f"got {dt['alignment_metric']!r}",
+        )
+    if dt["tempo_slope_window_sec"] <= 0:
+        raise ConfigurationError(
+            "detection.tempo_slope_window_sec must be positive.",
+            detail=f"got {dt['tempo_slope_window_sec']}",
+        )
+    if not 0.0 <= dt["tempo_max_inactive_fraction"] <= 1.0:
+        raise ConfigurationError(
+            "detection.tempo_max_inactive_fraction must be within [0, 1].",
+            detail=f"got {dt['tempo_max_inactive_fraction']}",
+        )
+    if not 0.0 <= dt["pause_max_voiced_fraction"] <= 1.0:
+        raise ConfigurationError(
+            "detection.pause_max_voiced_fraction must be within [0, 1].",
+            detail=f"got {dt['pause_max_voiced_fraction']}",
+        )
     if dt["energy_reduction_threshold_db"] >= 0:
         raise ConfigurationError(
             "detection.energy_reduction_threshold_db must be negative (dB drop).",
@@ -943,6 +1130,11 @@ def _build_detection(dt: dict[str, Any], root: Path) -> DetectionSettings:
         pause_min_difference_sec=float(dt["pause_min_difference_sec"]),
         tempo_ratio_min_deviation=float(dt["tempo_ratio_min_deviation"]),
         tempo_min_duration_sec=float(dt["tempo_min_duration_sec"]),
+        alignment_metric=str(dt["alignment_metric"]),
+        alignment_exclude_energy_coefficient=bool(dt["alignment_exclude_energy_coefficient"]),
+        tempo_slope_window_sec=float(dt["tempo_slope_window_sec"]),
+        tempo_max_inactive_fraction=float(dt["tempo_max_inactive_fraction"]),
+        pause_max_voiced_fraction=float(dt["pause_max_voiced_fraction"]),
         energy_reduction_threshold_db=float(dt["energy_reduction_threshold_db"]),
         energy_reduction_min_duration_sec=float(dt["energy_reduction_min_duration_sec"]),
         merge_gap_sec=float(dt["merge_gap_sec"]),
@@ -1005,8 +1197,86 @@ def _build_evaluation(ev: dict[str, Any], root: Path) -> EvaluationSettings:
     )
 
 
+def _choice(section: str, key: str, value: Any, valid: tuple[str, ...]) -> str:
+    text = str(value).strip().lower()
+    if text not in valid:
+        raise ConfigurationError(
+            f"{section}.{key} must be one of: {', '.join(valid)}.", detail=f"got {value!r}"
+        )
+    return text
+
+
+def _choice_list(
+    section: str, key: str, values: list[str], valid: tuple[str, ...]
+) -> tuple[str, ...]:
+    items = list(dict.fromkeys(v.strip().lower() for v in values))
+    if not items:
+        raise ConfigurationError(f"{section}.{key} must not be empty.")
+    bad = [i for i in items if i not in valid]
+    if bad:
+        raise ConfigurationError(
+            f"Unsupported value(s) in {section}.{key}: {', '.join(bad)}.",
+            detail=f"supported: {', '.join(valid)}",
+        )
+    return tuple(items)
+
+
+def _build_explanation(ex: dict[str, Any], root: Path) -> ExplanationSettings:
+    transcript_formats = [
+        t if t.startswith(".") else f".{t}" for t in (str(x) for x in ex["transcript_formats"])
+    ]
+    context = float(ex["playback_context_sec"])
+    if not (0.0 <= context <= 10.0):
+        raise ConfigurationError(
+            "explanation.playback_context_sec must be between 0 and 10 seconds.",
+            detail=f"got {context}",
+        )
+    max_excerpt = float(ex["max_excerpt_sec"])
+    if max_excerpt <= 0:
+        raise ConfigurationError(
+            "explanation.max_excerpt_sec must be positive.", detail=f"got {max_excerpt}"
+        )
+    similarity = float(ex["transcript_similarity_warning"])
+    if not (0.0 <= similarity <= 1.0):
+        raise ConfigurationError(
+            "explanation.transcript_similarity_warning must be in [0, 1].",
+            detail=f"got {similarity}",
+        )
+    ratio = float(ex["alignment_duration_ratio_warning"])
+    if ratio < 1.0:
+        raise ConfigurationError(
+            "explanation.alignment_duration_ratio_warning must be at least 1.0.",
+            detail=f"got {ratio}",
+        )
+    return ExplanationSettings(
+        default_page=_choice("explanation", "default_page", ex["default_page"], VALID_UI_PAGES),
+        analysis_modes=_choice_list(
+            "explanation", "analysis_modes", ex["analysis_modes"], VALID_ANALYSIS_MODES
+        ),
+        verbosity=_choice("explanation", "verbosity", ex["verbosity"], VALID_VERBOSITY),
+        sort_policy=_choice("explanation", "sort_policy", ex["sort_policy"], VALID_SORT_POLICIES),
+        playback_context_sec=context,
+        max_excerpt_sec=max_excerpt,
+        show_technical_evidence=bool(ex["show_technical_evidence"]),
+        transcript_formats=_choice_list(
+            "explanation", "transcript_formats", transcript_formats, VALID_TRANSCRIPT_FORMATS
+        ),
+        transcript_similarity_warning=similarity,
+        alignment_duration_ratio_warning=ratio,
+        upload_persistence=_choice(
+            "explanation", "upload_persistence", ex["upload_persistence"], VALID_UPLOAD_PERSISTENCE
+        ),
+        reports_dir=_resolve_dir(root, ex["reports_dir"], "explanation.reports_dir"),
+        export_formats=_choice_list(
+            "explanation", "export_formats", ex["export_formats"], VALID_EXPORT_FORMATS
+        ),
+        save_reports_automatically=bool(ex["save_reports_automatically"]),
+        show_benchmark_context=bool(ex["show_benchmark_context"]),
+    )
+
+
 def _build(values: dict[str, dict[str, Any]], root: Path, config_file: Path | None) -> Config:
-    app, storage, audio, ui, diag, ds, ft, dt, ev = (
+    app, storage, audio, ui, diag, ds, ft, dt, ev, ex = (
         values["app"],
         values["storage"],
         values["audio"],
@@ -1016,6 +1286,7 @@ def _build(values: dict[str, dict[str, Any]], root: Path, config_file: Path | No
         values["features"],
         values["detection"],
         values["evaluation"],
+        values["explanation"],
     )
 
     environment = str(app["environment"]).lower()
@@ -1073,6 +1344,7 @@ def _build(values: dict[str, dict[str, Any]], root: Path, config_file: Path | No
     features = _build_features(ft, root)
     detection = _build_detection(dt, root)
     evaluation = _build_evaluation(ev, root)
+    explanation = _build_explanation(ex, root)
 
     return Config(
         app=AppSettings(str(app["name"]), environment, log_level),
@@ -1092,6 +1364,7 @@ def _build(values: dict[str, dict[str, Any]], root: Path, config_file: Path | No
         features=features,
         detection=detection,
         evaluation=evaluation,
+        explanation=explanation,
         project_root=root,
         config_file=config_file,
     )

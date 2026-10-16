@@ -235,3 +235,42 @@ flowchart TD
 | `validator.py` | Audits evaluation reports for metric bounds $[0, 1]$, non-negative counts, and file integrity |
 | `reports.py` | Generates auditable GitHub-flavored markdown benchmark summaries |
 | `runner.py` | Coordinates the full evaluation pipeline and handles single-sample or batch cohorts |
+
+## Phase 6: participant analysis, explanations and reports
+
+Participant flow (no ground-truth annotation enters this chain):
+
+```
+reference + participant audio -> feature extraction -> reference comparison (DTW)
+  -> detection engine -> DetectionValidator -> evidence facts -> deterministic explanation cards
+  -> card validator -> participant dashboard / exported report
+```
+
+Evaluation flow (unchanged and separate):
+
+```
+ground-truth annotations + independently generated predictions -> matching -> metrics -> Evaluation Lab
+```
+
+Module responsibilities:
+
+| Module | Responsibility |
+|---|---|
+| `explainability/schema.py` | Evidence facts, bundles, cards, `ParticipantAnalysis` (half-open sample intervals; reference time kept separate) |
+| `explainability/facts.py` | Prediction evidence to validated facts; cross-field consistency; reference anchor/interval/unavailable |
+| `explainability/templates.py` | Digit-free deterministic wording; every number rendered from a fact and recorded as a claim |
+| `explainability/validator.py` | Numeric traceability, forbidden wording, status/content agreement |
+| `explainability/builder.py` | Validates the detection result, builds and verifies cards, facts-only fallback |
+| `explainability/reports.py` | Canonical JSON first; Markdown, HTML, CSV rendered from the saved JSON |
+| `participant/analyzer.py` | Staged workflow for registered and uploaded modes; explicit rights-gated registration |
+| `participant/playback.py` | Sample-exact excerpt bounds, clamping, reference anchors, WAV encoding |
+| `participant/transcript.py`, `benchmark.py` | Text-only transcript similarity; read-only aggregate benchmark context |
+| `ui/participant_panel.py`, `ui/participant_results.py` | Analyze and Overview pages; timeline, evidence, guidance, export |
+
+Isolation is enforced by `tests/test_explainability_grounding.py`, which parses the source of
+`explainability/` and `participant/` and fails on imports of the evaluation, generator, injector or
+dataset-schema modules (aside from the read-only benchmark reader) or on any reference to annotation
+fields. Uploaded audio is held in memory; the only persistent side effects are reference feature
+artifacts (derived from registered references), explicitly requested reports, and explicit
+registration.
+

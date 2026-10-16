@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 
-from conftest import REGISTER_DEFAULTS, write_fixture
 from flawbench.__main__ import main
 from flawbench.config import Config, load_config
 from flawbench.dataset.export import export_samples
@@ -14,6 +13,7 @@ from flawbench.dataset.registry import SourceRegistry
 from flawbench.dataset.schema import SourceRecord
 from flawbench.dataset.splits import build_splits
 from flawbench.exceptions import DatasetError
+from tests.conftest import REGISTER_DEFAULTS, write_fixture
 
 
 def register_many(cfg: Config, root: Path, n: int, start: int = 0) -> list[str]:

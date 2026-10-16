@@ -126,3 +126,19 @@ class EvaluationStoreError(EvaluationError):
 
 class EvaluationValidationError(EvaluationError):
     """Integrity audit of evaluation report failed."""
+
+
+class ExplanationError(FlawBenchError):
+    """Base class for Phase 6 explanation, participant-analysis and report failures."""
+
+
+class ExplanationInputError(ExplanationError):
+    """A detection result or evidence record is invalid and cannot be explained."""
+
+
+class ParticipantInputError(ExplanationError):
+    """The reference, participant recording or transcript supplied for analysis is unusable."""
+
+
+class ReportError(ExplanationError):
+    """A participant report could not be rendered or written."""

@@ -1,0 +1,212 @@
+name: p7-heldout-synthetic
+plan_version: 1
+seed: 11
+variants:
+- flaw: pause_insertion
+  parameters:
+    duration_sec: 0.5
+  placement:
+    at_sec: 1.5
+    mode: explicit
+  severity: medium
+  source: syn_10
+- flaw: tempo_change
+  parameters:
+    rate: 0.85
+    segment_sec: 2.0
+  placement:
+    mode: explicit
+    start_sec: 1.0
+  severity: medium
+  source: syn_10
+- flaw: energy_reduction
+  parameters:
+    gain_db: -6.0
+    segment_sec: 2.0
+  placement:
+    mode: explicit
+    start_sec: 3.0
+  severity: medium
+  source: syn_10
+- flaw: pause_insertion
+  parameters:
+    duration_sec: 1.0
+  placement:
+    at_sec: 2.5
+    mode: explicit
+  severity: medium
+  source: syn_11
+- flaw: tempo_change
+  parameters:
+    rate: 1.3
+    segment_sec: 2.0
+  placement:
+    mode: explicit
+    start_sec: 2.5
+  severity: medium
+  source: syn_11
+- flaw: energy_reduction
+  parameters:
+    gain_db: -12.0
+    segment_sec: 2.0
+  placement:
+    mode: explicit
+    start_sec: 1.0
+  severity: medium
+  source: syn_11
+- flaw: pause_insertion
+  parameters:
+    duration_sec: 2.0
+  placement:
+    at_sec: 3.5
+    mode: explicit
+  severity: medium
+  source: syn_12
+- flaw: tempo_change
+  parameters:
+    rate: 1.5
+    segment_sec: 2.0
+  placement:
+    mode: explicit
+    start_sec: 3.0
+  severity: medium
+  source: syn_12
+- flaw: energy_reduction
+  parameters:
+    gain_db: -24.0
+    segment_sec: 2.0
+  placement:
+    mode: explicit
+    start_sec: 4.0
+  severity: medium
+  source: syn_12
+- flaw: pause_insertion
+  parameters:
+    duration_sec: 0.5
+  placement:
+    at_sec: 4.5
+    mode: explicit
+  severity: medium
+  source: syn_13
+- flaw: tempo_change
+  parameters:
+    rate: 0.6
+    segment_sec: 2.0
+  placement:
+    mode: explicit
+    start_sec: 1.5
+  severity: medium
+  source: syn_13
+- flaw: energy_reduction
+  parameters:
+    gain_db: -6.0
+    segment_sec: 2.0
+  placement:
+    mode: explicit
+    start_sec: 2.0
+  severity: medium
+  source: syn_13
+- flaw: pause_insertion
+  parameters:
+    duration_sec: 1.0
+  placement:
+    at_sec: 2.0
+    mode: explicit
+  severity: medium
+  source: syn_14
+- flaw: tempo_change
+  parameters:
+    rate: 0.85
+    segment_sec: 2.0
+  placement:
+    mode: explicit
+    start_sec: 4.0
+  severity: medium
+  source: syn_14
+- flaw: energy_reduction
+  parameters:
+    gain_db: -12.0
+    segment_sec: 2.0
+  placement:
+    mode: explicit
+    start_sec: 1.5
+  severity: medium
+  source: syn_14
+- flaw: pause_insertion
+  parameters:
+    duration_sec: 2.0
+  placement:
+    at_sec: 3.0
+    mode: explicit
+  severity: medium
+  source: syn_15
+- flaw: tempo_change
+  parameters:
+    rate: 1.3
+    segment_sec: 2.0
+  placement:
+    mode: explicit
+    start_sec: 1.0
+  severity: medium
+  source: syn_15
+- flaw: energy_reduction
+  parameters:
+    gain_db: -24.0
+    segment_sec: 2.0
+  placement:
+    mode: explicit
+    start_sec: 3.5
+  severity: medium
+  source: syn_15
+- flaw: pause_insertion
+  parameters:
+    duration_sec: 0.5
+  placement:
+    at_sec: 5.0
+    mode: explicit
+  severity: medium
+  source: syn_16
+- flaw: tempo_change
+  parameters:
+    rate: 1.5
+    segment_sec: 2.0
+  placement:
+    mode: explicit
+    start_sec: 2.0
+  severity: medium
+  source: syn_16
+- flaw: energy_reduction
+  parameters:
+    gain_db: -6.0
+    segment_sec: 2.0
+  placement:
+    mode: explicit
+    start_sec: 4.5
+  severity: medium
+  source: syn_16
+- flaw: pause_insertion
+  parameters:
+    duration_sec: 1.0
+  placement:
+    at_sec: 1.0
+    mode: explicit
+  severity: medium
+  source: syn_17
+- flaw: tempo_change
+  parameters:
+    rate: 0.6
+    segment_sec: 2.0
+  placement:
+    mode: explicit
+    start_sec: 3.5
+  severity: medium
+  source: syn_17
+- flaw: energy_reduction
+  parameters:
+    gain_db: -12.0
+    segment_sec: 2.0
+  placement:
+    mode: explicit
+    start_sec: 0.5
+  severity: medium
+  source: syn_17

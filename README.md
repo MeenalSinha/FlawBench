@@ -27,7 +27,7 @@ Planned flaw categories: excessive pauses, local pacing deviations, local energy
 8. Show audio comparisons, feature graphs, detections, and explanations.
 9. Export reproducible results.
 
-## Current scope: Phases 1, 2, 3, 4, and 5 (implemented)
+## Current scope: Phases 1 to 6 (implemented)
 
 | Capability | Status |
 |---|---|
@@ -63,7 +63,13 @@ Planned flaw categories: excessive pauses, local pacing deviations, local energy
 | Immutable evaluation store, catalog manifest, and artifact validation | Implemented (Phase 5) |
 | Interactive Streamlit Evaluation Lab panel with KPI cards, Plotly curves, and confusion heatmaps | Implemented (Phase 5) |
 | Pitch-variation flattening | Planned extension, not implemented |
-| Evidence-linked natural language explanations & participant dashboard | Planned (Phase 6) |
+| Participant analysis: registered variant or in-memory upload compared with a registered reference | Implemented (Phase 6) |
+| Deterministic evidence-linked explanation cards (pause, tempo, energy) with numeric traceability checks | Implemented (Phase 6) |
+| Timeline of candidate intervals, reference alignment plots, and interval-specific audio excerpts | Implemented (Phase 6) |
+| Exportable participant reports (JSON, Markdown, HTML, CSV) rendered from the saved analysis | Implemented (Phase 6) |
+| Multi-page dashboard separating participant analysis, Evaluation Lab and technical panels | Implemented (Phase 6) |
+| Detector v5 (windowed tempo slope, level-invariant alignment, silence/voicing guards), explicit F0-correlation policy, deterministic prediction IDs, QA test suites | In progress (Phase 7, synthetic-fixture validation only) |
+| Optional LLM wording layer, pitch-related detection, word-level alignment, overall quality score | Not implemented |
 
 FlawBench extracts real acoustic features, computes differential DTW alignments, independently detects speech delivery flaws without accessing ground-truth labels, and rigorously benchmarks predicted intervals against known truth using deterministic one-to-one temporal IoU matching.
 
@@ -109,6 +115,22 @@ python -m flawbench evaluate validate --run <run_id>
 
 Schema, timeline convention, seed policy: `docs/dataset_schema.md`. Evaluation methodology and schema: `docs/evaluation_methodology.md` and `docs/evaluation_schema.md`. Severity profiles are experimental manipulation strengths, not human-rated severities. No audio is shipped: you must supply a recording you have the rights to use. Tests use synthetic tones only.
 
+## Participant analysis (Phase 6)
+
+```bash
+# Compare a recording with a registered reference (audio is read, never stored)
+python -m flawbench explain upload --source <SOURCE_ID> --audio my_take.wav [--transcript t.txt] [--export]
+# Analyze a registered variant as if it were a participant recording (labels are not read)
+python -m flawbench explain registered --sample <SAMPLE_ID> [--export]
+```
+
+In the app, use Analyze Speech, then Flaw Timeline, Acoustic Evidence and Improvement Guidance. Each
+candidate gets Observation, Evidence, Interpretation, Suggested review and Limitations sections whose
+numbers come from validated detector evidence. Findings are candidates, not confirmed errors, and
+the detector evidence strength is an uncalibrated heuristic, not a probability. A zero-candidate
+result is shown as a completed analysis and does not mean the delivery is free of problems.
+See `docs/explanation_methodology.md` and `docs/participant_report_schema.md`.
+
 ## Technology stack
 
 Python 3.10+, NumPy, soundfile (libsndfile), audiotsm (WSOLA time-stretch), librosa (spectral, MFCC, YIN pitch, DTW), plotly (interactive visualization), PyYAML, Streamlit; pytest, ruff, mypy for development.
@@ -145,6 +167,8 @@ FlawBench/
     features/                 Phase 3 engine: frame grid, extractors, DTW comparison, store
     detection/                Phase 4 engine: label-free inputs, detectors, store, validator
     evaluation/               Phase 5 engine: 1-to-1 matching, metrics, confusion, controls, store
+    explainability/           Phase 6 evidence facts, deterministic templates, validator, reports
+    participant/              Phase 6 analysis workflow, playback excerpts, transcript check
     __main__.py               CLI: config, check, dataset, features, detect, evaluate
   tests/                      pytest suite
   data/reference/             Reference recordings (contents git-ignored)
@@ -217,6 +241,8 @@ ruff check src tests app.py && mypy
 - Detections and predictions are completely label-free; formal benchmark metrics against ground truth are evaluated strictly post-inference.
 - Phase 5: Evaluation metrics computed against synthetic audio fixtures verify algorithmic execution, mathematical correctness, filter responses, and localization boundaries. They do not establish generalizability to naturally recorded human speech. Authentic benchmark claims require licensed or self-recorded human speech corpora.
 - Source-level bootstrap confidence intervals require $\ge 3$ distinct source recordings; smaller cohorts are reported with documented sample-size caveats.
+
+- Phase 6: Explanations are deterministic templates over detector evidence. Only pause, tempo and energy-reduction deviations are analyzed; pitch and other delivery aspects are not. No audio-text alignment backend exists, so no word-level references are given. Phase 7 investigated the Phase 6 tempo-recall and energy/pause false-positive weaknesses and changed the detectors (detector version 5.0); results are in `docs/phase_7_validation_report.md`. They were measured on synthetic harmonic-tone fixtures only: no natural-speech or manually annotated validation exists, so no accuracy claim about human speech is made. The mildest tempo setting (rate 0.85, equal to the configured 0.15 minimum deviation) is not reliably detected, and a tempo candidate can appear next to a long pause edge. Source types are declared at registration and are not verified; the registry has no synthetic type, so synthetic fixtures are not flagged as synthetic. See `docs/quality_assurance.md`. Source types are declared at registration and are not verified.
 
 ## Planned phases
 

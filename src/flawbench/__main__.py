@@ -197,6 +197,11 @@ def build_parser() -> argparse.ArgumentParser:
     ev_run.add_argument(
         "--bootstrap", action="store_true", default=None, help="enable source-level bootstrap CIs"
     )
+    ev_run.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="replace an existing run with the same --run-id (default: refuse)",
+    )
 
     ev_ls = esub.add_parser("list", help="list saved evaluation runs from manifest")
     _add_config_option(ev_ls, is_sub=True)
@@ -210,7 +215,60 @@ def build_parser() -> argparse.ArgumentParser:
     _add_config_option(ev_val, is_sub=True)
     ev_val.add_argument("--run", required=True, help="evaluation run identifier")
 
+    ex = sub.add_parser("explain", help="participant analysis with evidence-linked explanations")
+    _add_config_option(ex, is_sub=True)
+    xsub = ex.add_subparsers(dest="explain_command", required=True, metavar="action")
+
+    x_reg = xsub.add_parser("registered", help="analyze a registered variant (labels not read)")
+    _add_config_option(x_reg, is_sub=True)
+    x_reg.add_argument("--sample", required=True, help="registered sample id")
+    x_reg.add_argument("--export", action="store_true", help="write report files")
+
+    x_up = xsub.add_parser("upload", help="compare an audio file with a registered reference")
+    _add_config_option(x_up, is_sub=True)
+    x_up.add_argument("--source", required=True, help="registered reference source id")
+    x_up.add_argument("--audio", required=True, help="participant recording path (not stored)")
+    x_up.add_argument("--transcript", help="optional participant transcript file")
+    x_up.add_argument("--export", action="store_true", help="write report files")
+
     return parser
+
+
+def _run_explain(args: argparse.Namespace, config: Config) -> int:
+    from flawbench.explainability.reports import export_report
+    from flawbench.participant import ParticipantAnalyzer
+    from flawbench.participant.transcript import read_transcript_bytes
+
+    analyzer = ParticipantAnalyzer(config)
+    if args.explain_command == "registered":
+        session = analyzer.analyze_registered(args.sample)
+    else:
+        audio_path = Path(args.audio)
+        data = audio_path.read_bytes()
+        text = None
+        if args.transcript:
+            tpath = Path(args.transcript)
+            text = read_transcript_bytes(
+                tpath.read_bytes(), tpath.name, config.explanation.transcript_formats
+            )
+        session = analyzer.analyze_upload(args.source, data, audio_path.name, text)
+    a = session.analysis
+    print(f"session {a.session_id}: {a.status}")
+    if a.failure:
+        print(f"failure: {a.failure}")
+    for stage in a.stages:
+        print(f"  stage {stage.name}: {stage.status}")
+    for name, why in a.categories_failed.items():
+        print(f"  detector failed: {name}: {why}")
+    for card in a.cards:
+        v = card.bundle.variant
+        print(f"- {card.title} {v.start_sec:.2f}-{v.end_sec:.2f} s: {card.observation}")
+    if a.status == "completed_no_candidates":
+        print("No candidate met the detector's decision rules (not proof of flawless delivery).")
+    if args.export or config.explanation.save_reports_automatically:
+        for fmt, path in export_report(a, config.explanation).items():
+            print(f"wrote {fmt}: {path}")
+    return 1 if a.status == "failed" else 0
 
 
 def _run_phase1(args: argparse.Namespace, config: Config) -> int:
@@ -539,6 +597,7 @@ def _run_evaluate(args: argparse.Namespace, config: Config) -> int:
             run_id=args.run_id,
             include_controls=include_controls,
             enable_bootstrap=args.bootstrap,
+            overwrite=args.overwrite,
         )
         agg = report.aggregate
         p_str = f"{agg.micro_precision:.3f}" if agg and agg.micro_precision is not None else "N/A"
@@ -630,6 +689,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _run_detect(args, config)
         if args.command == "evaluate":
             return _run_evaluate(args, config)
+        if args.command == "explain":
+            return _run_explain(args, config)
         return _run_phase1(args, config)
     except FlawBenchError as exc:
         print(

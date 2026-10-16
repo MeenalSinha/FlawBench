@@ -119,3 +119,35 @@ def test_postprocess_filters_short_candidates() -> None:
 
     assert len(result) == 1
     assert result[0].prediction_id == "p_valid"
+
+
+def test_merge_keeps_zero_reference_time_when_other_side_is_missing() -> None:
+    """Regression: ``a or b`` discarded a legitimate reference time of 0.0 when merging."""
+    from flawbench.detection.postprocess import postprocess_predictions
+    from flawbench.detection.schema import FlawPrediction
+
+    sr = 1000
+
+    def pred(pid: str, a: int, b: int, ref: tuple[float, float] | None) -> FlawPrediction:
+        return FlawPrediction(
+            prediction_id=pid,
+            flaw_type="tempo_change",
+            start_sample=a,
+            end_sample=b,
+            start_sec=a / sr,
+            end_sec=b / sr,
+            duration_sec=(b - a) / sr,
+            ref_start_sec=ref[0] if ref else None,
+            ref_end_sec=ref[1] if ref else None,
+        )
+
+    merged = postprocess_predictions(
+        [pred("a", 0, 300, (0.0, 0.3)), pred("b", 310, 600, None)],
+        merge_gap_sec=0.05,
+        min_candidate_duration_sec=0.01,
+        total_samples=1000,
+        sample_rate=sr,
+    )
+    assert len(merged) == 1
+    assert merged[0].ref_start_sec == 0.0
+    assert merged[0].ref_end_sec == 0.3

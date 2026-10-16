@@ -12,6 +12,15 @@ from typing import Any
 from flawbench.detection.schema import FlawPrediction
 
 
+def _merge_ref(a: float | None, b: float | None, pick: Any) -> float | None:
+    """Combine two optional reference times; 0.0 is a valid time, so test for None explicitly."""
+    if a is None:
+        return b
+    if b is None:
+        return a
+    return float(pick(a, b))
+
+
 def postprocess_predictions(
     candidates: list[FlawPrediction],
     *,
@@ -60,16 +69,8 @@ def postprocess_predictions(
                 end_sec = end_sample / sample_rate
                 duration_sec = end_sec - start_sec
 
-                ref_s = (
-                    min(last.ref_start_sec, cand.ref_start_sec)
-                    if (last.ref_start_sec is not None and cand.ref_start_sec is not None)
-                    else (last.ref_start_sec or cand.ref_start_sec)
-                )
-                ref_e = (
-                    max(last.ref_end_sec, cand.ref_end_sec)
-                    if (last.ref_end_sec is not None and cand.ref_end_sec is not None)
-                    else (last.ref_end_sec or cand.ref_end_sec)
-                )
+                ref_s = _merge_ref(last.ref_start_sec, cand.ref_start_sec, min)
+                ref_e = _merge_ref(last.ref_end_sec, cand.ref_end_sec, max)
 
                 combined_evidence: dict[str, Any] = dict(last.evidence)
                 combined_evidence.update({f"merged_{k}": v for k, v in cand.evidence.items()})

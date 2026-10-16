@@ -53,7 +53,7 @@ class ComparisonResult:
     local_slope: NDArray[np.float64]
 
     # Aggregated metrics
-    global_metrics: dict[str, float] = field(default_factory=dict)
+    global_metrics: dict[str, float | str | None] = field(default_factory=dict)
     candidate_regions: list[dict[str, Any]] = field(default_factory=list)
 
     @property
@@ -227,11 +227,42 @@ def _detect_candidate_flaw_regions(
     return candidates
 
 
+#: Minimum number of jointly voiced aligned points for a Pearson correlation to be reported.
+#: Algorithmic constant of the statistic (fewer points make the coefficient meaningless).
+_MIN_CORRELATION_POINTS = 4
+
+
+def _f0_correlation(
+    ref_f0: NDArray[np.float64], var_f0: NDArray[np.float64]
+) -> tuple[float | None, str]:
+    """Pearson correlation of jointly voiced F0, with an explicit validity policy.
+
+    Returns ``(value, status)``. ``value`` is ``None`` whenever the coefficient is mathematically
+    undefined or not meaningful; ``status`` then states why. Undefined is never replaced by 0.0:
+    zero would assert "no linear relation", which is a measured outcome, not a missing one.
+    """
+    ref = np.asarray(ref_f0, dtype=np.float64)
+    var = np.asarray(var_f0, dtype=np.float64)
+    if ref.shape != var.shape:
+        return None, "unavailable_shape_mismatch"
+    if ref.size < _MIN_CORRELATION_POINTS:
+        return None, "unavailable_insufficient_voiced_points"
+    if not (np.isfinite(ref).all() and np.isfinite(var).all()):
+        return None, "unavailable_non_finite_input"
+    if float(np.ptp(ref)) == 0.0 or float(np.ptp(var)) == 0.0:
+        return None, "unavailable_constant_f0"
+    corr = float(np.corrcoef(ref, var)[0, 1])
+    if not np.isfinite(corr):
+        return None, "unavailable_undefined"
+    return corr, "ok"
+
+
 def compare_features(
     ref_features: FeatureResult,
     var_features: FeatureResult,
     *,
     metric: str = "cosine",
+    exclude_energy_coefficient: bool = False,
 ) -> ComparisonResult:
     """Perform differential time-series analysis and reference comparison using DTW alignment.
 
@@ -239,6 +270,9 @@ def compare_features(
         ref_features: FeatureResult of the reference audio recording.
         var_features: FeatureResult of the variant/modified audio recording.
         metric: Distance metric for DTW (default: 'cosine', or 'euclidean').
+        exclude_energy_coefficient: Drop MFCC c0 (the energy term) from the alignment cost so the
+            warp path does not depend on loudness. Only the alignment changes; the differential
+            RMS and spectral-distance outputs still use the full feature set.
 
     Returns:
         ComparisonResult containing warp path, differential curves, and anomaly candidates.
@@ -251,6 +285,12 @@ def compare_features(
     # Prepare feature matrices for DTW: (n_features, n_frames)
     X = ref_features.mfcc.T
     Y = var_features.mfcc.T
+    if exclude_energy_coefficient:
+        if X.shape[0] < 2 or Y.shape[0] < 2:
+            raise FeatureComparisonError(
+                "Cannot exclude the energy coefficient: fewer than 2 MFCC coefficients."
+            )
+        X, Y = X[1:], Y[1:]
 
     if X.shape[0] != Y.shape[0]:
         raise FeatureComparisonError(
@@ -318,12 +358,9 @@ def compare_features(
     var_dur = var_features.metadata.duration_seconds
     duration_ratio = float(var_dur / max(1e-4, ref_dur))
 
-    voiced_pts = np.sum(both_voiced)
-    if voiced_pts > 3:
-        corr_matrix = np.corrcoef(aligned_ref_f0[both_voiced], aligned_var_f0[both_voiced])
-        f0_corr = float(corr_matrix[0, 1]) if not np.isnan(corr_matrix[0, 1]) else 0.0
-    else:
-        f0_corr = 0.0
+    f0_corr, f0_corr_status = _f0_correlation(
+        aligned_ref_f0[both_voiced], aligned_var_f0[both_voiced]
+    )
 
     global_metrics = {
         "dtw_total_cost": total_cost,
@@ -335,7 +372,11 @@ def compare_features(
         "max_delta_rms_db": float(np.max(delta_rms_db)),
         "min_delta_rms_db": float(np.min(delta_rms_db)),
         "mean_spectral_distance": float(np.mean(spectral_distance)),
+        # None means "unavailable" (see f0_voiced_correlation_status); it is never coerced to 0.
         "f0_voiced_correlation": f0_corr,
+        "f0_voiced_correlation_status": f0_corr_status,
+        "dtw_metric": metric,
+        "dtw_excludes_energy_coefficient": exclude_energy_coefficient,
     }
 
     # Candidate flaw region detection

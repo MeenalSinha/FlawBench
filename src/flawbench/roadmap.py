@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 IMPLEMENTED = "Implemented"
 PLANNED = "Planned (not implemented)"
+IN_PROGRESS = "In progress (release candidate; see docs/phase_7_validation_report.md)"
 
 
 @dataclass(frozen=True)
@@ -51,7 +52,16 @@ PHASES: tuple[Phase, ...] = (
     Phase(
         6,
         "Explanations and final dashboard",
-        "Evidence-linked explanations, reference-versus-participant visualization.",
-        PLANNED,
+        "Participant analysis, evidence-linked explanations, interval playback, reports and "
+        "dashboard.",
+        IMPLEMENTED,
+    ),
+    Phase(
+        7,
+        "Quality assurance and reliability hardening",
+        "Detector-reliability fixes, numerical-stability policy, regression, robustness and "
+        "security tests, and release-candidate validation on synthetic fixtures. Natural-speech "
+        "validation and real-browser testing are not done.",
+        IN_PROGRESS,
     ),
 )

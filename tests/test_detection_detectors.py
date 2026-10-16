@@ -168,3 +168,25 @@ def test_identical_audio_yields_zero_detections(config: Config) -> None:
     assert len(p_det) == 0
     assert len(t_det) == 0
     assert len(e_det) == 0
+
+
+def test_inserted_pause_with_frozen_reference_yields_valid_result(config: Config) -> None:
+    """Regression: a pause that holds the DTW reference position fixed also triggers the energy
+    detector; its zero-length reference span used to make the whole result fail validation."""
+    from flawbench.detection.engine import DetectionEngine
+    from flawbench.detection.validator import DetectionValidator
+
+    sr = 16000
+    part1 = _tone(freq=300.0, dur=0.5, sr=sr)
+    part2 = _tone(freq=400.0, dur=0.5, sr=sr)
+    ref = np.concatenate([part1, part2])
+    var = np.concatenate([part1, np.zeros(int(0.4 * sr), dtype=np.float32), part2])
+    inp = build_detection_input_from_features(
+        extract_features(ref, sample_rate=sr, config=config),
+        extract_features(var, sample_rate=sr, config=config),
+    )
+    result = DetectionEngine(config.detection).detect(inp)
+    assert DetectionValidator().validate_result(result) == []
+    for p in result.predictions:
+        if p.flaw_type != "pause_insertion" and p.ref_start_sec is not None:
+            assert p.ref_end_sec is not None and p.ref_end_sec > p.ref_start_sec

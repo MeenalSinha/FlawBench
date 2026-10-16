@@ -26,7 +26,7 @@ from flawbench.paths import ProjectPaths
 
 @pytest.fixture
 def test_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> ProjectPaths:
-    monkeypatch.setenv("FLAWBENCH_ROOT", str(tmp_path))
+    monkeypatch.setenv("FLAWBENCH_PROJECT_ROOT", str(tmp_path))
     cfg = load_config()
     paths = ProjectPaths(cfg)
     paths.ensure_output_directories()

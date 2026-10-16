@@ -7,12 +7,23 @@ from flawbench.evaluation.schema import EvaluationReport
 
 def generate_markdown_report(report: EvaluationReport) -> str:
     """Generate a structured Markdown report from an EvaluationReport."""
-    prov_str = "⚠️ Synthetic Signals Only" if report.is_synthetic_only else "Natural Speech"
+    prov_str = (
+        "WARNING: Synthetic Signals Only"
+        if report.is_synthetic_only
+        else (
+            "Audio origin is taken from registration metadata only and is not independently "
+            "verified. The registry has no synthetic source type, so synthetic fixtures are NOT "
+            "identified by this field; treat results as unvalidated for natural speech unless "
+            "annotated, licensed speech was used."
+        )
+    )
     lines: list[str] = [
         f"# FlawBench Evaluation Report: `{report.run_id}`",
         "",
         f"- **Generated At**: {report.created_at}",
-        f"- **FlawBench Version**: {report.detector_version}",
+        f"- **Detector Version**: {report.detector_version}",
+        f"- **Detector Config Fingerprint**: `{report.detector_config_fingerprint}`",
+        f"- **FlawBench Version**: {report.metadata.get('flawbench_version', 'unknown')}",
         f"- **Evaluation Split**: `{report.split}`",
         f"- **Cohort Size**: {report.sample_count} samples across {report.source_count} sources",
         f"- **Audio Provenance**: {prov_str}",

@@ -22,7 +22,7 @@ audio:
 
 ui:
   page_title: "FlawBench - Speech Flaw Analysis"
-  layout: centered              # centered | wide
+  layout: wide                  # centered | wide
   show_roadmap: true
 
 diagnostics:
@@ -94,6 +94,11 @@ detection:
   pause_min_difference_sec: 0.10
   tempo_ratio_min_deviation: 0.15
   tempo_min_duration_sec: 0.25
+  alignment_metric: euclidean     # DTW metric used for detection alignment (euclidean | cosine)
+  alignment_exclude_energy_coefficient: true  # drop MFCC c0 so alignment does not depend on loudness
+  tempo_slope_window_sec: 0.5     # time window used to estimate local DTW warp slope
+  tempo_max_inactive_fraction: 0.2 # windows with more silent frames than this give no tempo evidence
+  pause_max_voiced_fraction: 0.25 # a pause candidate may contain at most this fraction of voiced frames
   energy_reduction_threshold_db: -4.0
   energy_reduction_min_duration_sec: 0.15
   merge_gap_sec: 0.05
@@ -116,3 +121,19 @@ evaluation:
   evaluations_manifest_filename: evaluations_manifest.jsonl
   schema_version: "5.0"
 
+explanation:
+  default_page: overview             # overview | analyze | timeline | evidence | guidance | evaluation | technical
+  analysis_modes: ["registered_variant", "uploaded_participant"]
+  verbosity: standard                # concise | standard | detailed
+  sort_policy: chronological         # chronological | evidence_strength
+  playback_context_sec: 1.0          # context before/after a flagged interval in excerpts
+  max_excerpt_sec: 30.0              # upper bound on a single playback excerpt
+  show_technical_evidence: true
+  transcript_formats: [".txt"]       # .txt | .md
+  transcript_similarity_warning: 0.8 # warn when word-sequence similarity falls below this
+  alignment_duration_ratio_warning: 2.0 # warn when recording lengths differ by more than this factor
+  upload_persistence: explicit_registration # transient_only | explicit_registration
+  reports_dir: outputs/participant_reports
+  export_formats: ["markdown", "html", "json", "csv"]
+  save_reports_automatically: false
+  show_benchmark_context: true

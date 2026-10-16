@@ -11,13 +11,14 @@ Provides interactive visualization and inspection of formal evaluation metrics:
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any
 
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from flawbench.config import Config
+from flawbench.config import VALID_EVALUATION_SPLITS, Config
 from flawbench.evaluation.runner import EvaluationRunner
 from flawbench.evaluation.store import EvaluationStore
 from flawbench.exceptions import FlawBenchError
@@ -34,6 +35,11 @@ def render_evaluation_panel(
         "annotations using deterministic one-to-one temporal IoU matching."
     )
 
+    st.info(
+        "This lab measures detector performance on a benchmark cohort with known annotations. "
+        "It is separate from Participant Analysis and says nothing about any single participant "
+        "recording."
+    )
     store = EvaluationStore(paths)
     runs = store.list_runs()
 
@@ -42,12 +48,12 @@ def render_evaluation_panel(
         with col_setup1:
             split_choice = st.selectbox(
                 "Evaluation Split",
-                options=["test", "validation", "train", "all"],
+                options=list(VALID_EVALUATION_SPLITS),
                 index=0,
                 help="Source-level partitioned evaluation cohort.",
             )
         with col_setup2:
-            _ = st.slider(
+            iou_choice = st.slider(
                 "Matching IoU Threshold",
                 min_value=0.1,
                 max_value=0.9,
@@ -70,7 +76,13 @@ def render_evaluation_panel(
         if st.button("Run Formal Evaluation", type="primary"):
             with st.spinner("Executing independent evaluation and event matching..."):
                 try:
-                    runner = EvaluationRunner(config, paths)
+                    run_config = replace(
+                        config,
+                        evaluation=replace(
+                            config.evaluation, matching_iou_threshold=float(iou_choice)
+                        ),
+                    )
+                    runner = EvaluationRunner(run_config, paths)
                     report, run_dir = runner.run(
                         split=split_choice,
                         include_controls=include_ctrls,
@@ -112,10 +124,16 @@ def render_evaluation_panel(
     # 1. Provenance & Limitation Notice
     if report.is_synthetic_only:
         st.warning(
-            "⚠️ **Synthetic Audio Limitation**: This evaluation was executed solely on "
+            "**Synthetic audio limitation**: This evaluation was executed solely on "
             "synthetic audio signals. These metrics verify algorithmic detection logic and "
             "interval boundaries, but do NOT prove generalization to natural human speech.",
-            icon="⚠️",
+        )
+
+    else:
+        st.caption(
+            "Provenance: source types are declared at registration and are not independently "
+            "verified. These metrics describe this cohort only and do not by themselves show "
+            "generalization to other speech."
         )
 
     # 2. Headline Metrics

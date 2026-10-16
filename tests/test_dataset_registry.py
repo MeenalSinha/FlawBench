@@ -4,12 +4,12 @@ from pathlib import Path
 
 import pytest
 
-from conftest import REGISTER_DEFAULTS, write_fixture
 from flawbench.config import Config, load_config
 from flawbench.dataset.io import sha256_file
 from flawbench.dataset.registry import SourceRegistry
 from flawbench.dataset.schema import SourceRecord
 from flawbench.exceptions import DatasetError, RegistryError
+from tests.conftest import REGISTER_DEFAULTS, write_fixture
 
 
 def test_registration_records_real_metadata(
@@ -121,7 +121,7 @@ def test_file_outside_reference_dir_needs_copy_and_never_overwrites(
     clash = clash_dir / "ext.wav"
     import soundfile as sf
 
-    from conftest import SYN_RATE, synthetic_signal
+    from tests.conftest import SYN_RATE, synthetic_signal
 
     sf.write(clash, synthetic_signal(3.0, 9), SYN_RATE)
     with pytest.raises(RegistryError, match="refusing to overwrite"):

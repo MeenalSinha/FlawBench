@@ -32,10 +32,14 @@ def test_app_runs_and_reports_real_status(isolated_env: Path) -> None:
     assert at.title[0].value == "FlawBench"
     body = texts(at)
     assert "Evidence-Based Speech Flaw Analysis" in body
-    assert "Analysis has not been performed" in body
+    # Phase 6: the participant workflow lives on its own page; the overview must not claim an
+    # analysis was run when none was (formerly asserted via the "Analysis has not been performed"
+    # caption of the single-page layout).
+    assert "None run in this session" in body
     assert (isolated_env / "outputs" / "reports").is_dir()  # writable dirs prepared from config
     assert any("Reference directory" in e.value and "does not exist" in e.value for e in at.error)
-    assert "Planned (not implemented)" in body
+    assert "Project roadmap" in "\n".join(sub.value for sub in at.subheader)
+    assert "Implemented" in body
 
 
 def test_configuration_change_alters_behavior_without_code_edits(
@@ -75,6 +79,9 @@ def _wav_bytes(seconds: float = 0.5, rate: int = 16000) -> bytes:
 def test_app_shows_real_empty_dataset_state(isolated_env: Path) -> None:
     at = AppTest.from_file(APP, default_timeout=30).run()
     assert not at.exception
+    # Phase 6 moved the dataset panel to the "Dataset and Technical Details" page.
+    at.sidebar.radio[0].set_value("technical").run()
+    assert not at.exception
     counts = {m.label: m.value for m in at.metric}
     assert counts["Registered sources"] == "0" and counts["Generated samples"] == "0"
     assert any("No reference recordings are registered" in i.value for i in at.info)
@@ -83,11 +90,9 @@ def test_app_shows_real_empty_dataset_state(isolated_env: Path) -> None:
     assert any("dataset is empty" in i.value for i in at.info)
 
 
-@pytest.mark.skip(
-    reason="AppTest.file_uploader not available in Streamlit <1.65; upgrade Streamlit to re-enable"
-)
 def test_valid_upload_shows_real_metadata_and_no_analysis(isolated_env: Path) -> None:
     at = AppTest.from_file(APP, default_timeout=30).run()
+    at.sidebar.radio[0].set_value("technical").run()  # inspection uploader moved in Phase 6
     at.file_uploader[0].set_value(("tone.wav", _wav_bytes(0.5, 16000), "audio/wav")).run()  # type: ignore[attr-defined]
     assert not at.exception
     metrics = {m.label: m.value for m in at.metric}
@@ -95,14 +100,16 @@ def test_valid_upload_shows_real_metadata_and_no_analysis(isolated_env: Path) ->
     assert metrics["Duration"] == "0.50 s"
     assert metrics["Channels"] == "1"
     assert metrics["Container"] == "WAV"
-    assert any("Analysis has not been performed" in i.value for i in at.info)
+    # Phase 6: this uploader only inspects features; it must not claim detection was run
+    # (the old single-page app wrongly displayed "Analysis complete ... flaw detection").
+    shown = "\n".join(e.value for e in [*at.info, *at.success, *at.markdown, *at.caption])
+    assert "Analysis complete" not in shown
+    assert "no flaw detection is run here" in shown
 
 
-@pytest.mark.skip(
-    reason="AppTest.file_uploader not available in Streamlit <1.65; upgrade Streamlit to re-enable"
-)
 def test_fake_audio_upload_is_rejected_cleanly(isolated_env: Path) -> None:
     at = AppTest.from_file(APP, default_timeout=30).run()
+    at.sidebar.radio[0].set_value("technical").run()
     at.file_uploader[0].set_value(("fake.wav", b"not audio at all" * 20, "audio/wav")).run()  # type: ignore[attr-defined]
     assert not at.exception
     assert not {m.label for m in at.metric} & {"Sample rate", "Duration", "Channels"}
@@ -111,15 +118,13 @@ def test_fake_audio_upload_is_rejected_cleanly(isolated_env: Path) -> None:
     assert "Traceback" not in errors and str(isolated_env) not in errors
 
 
-@pytest.mark.skip(
-    reason="AppTest.file_uploader not available in Streamlit <1.65; upgrade Streamlit to re-enable"
-)
 def test_upload_limit_and_allowed_types_come_from_configuration(
     isolated_env: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("FLAWBENCH_AUDIO_EXTENSIONS", ".wav")
     monkeypatch.setenv("FLAWBENCH_MAX_UPLOAD_MB", "1")
     at = AppTest.from_file(APP, default_timeout=30).run()
+    at.sidebar.radio[0].set_value("technical").run()
     assert at.file_uploader[0].allowed_type == [".wav"] or at.file_uploader[0].allowed_type == [  # type: ignore[attr-defined]
         "wav"
     ]

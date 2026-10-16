@@ -1,0 +1,29 @@
+smp-0fb25721 syn_2 GT pause_insertion   [3.00,4.00] {'duration_sec': 1.0}
+      PRED pause_insertion   [3.00,3.99] s=0.994 {'mean_variant_rms_db': -118.02, 'ref_frozen_fraction': 1.0}
+      PRED energy_reduction  [3.01,4.00] s=0.864 {'mean_delta_rms_db': -100.76}
+smp-23e46f48 syn_3 GT energy_reduction  [2.00,4.00] {'gain_db': -24.0, 'segment_sec': 2.0}
+      PRED energy_reduction  [2.01,3.99] s=1.0 {'mean_delta_rms_db': -21.09}
+      PRED pause_insertion   [2.01,3.99] s=0.996 {'mean_variant_rms_db': -38.73, 'ref_frozen_fraction': 0.99}
+smp-3926906f syn_0 GT energy_reduction  [2.00,4.00] {'gain_db': -24.0, 'segment_sec': 2.0}
+      PRED pause_insertion   [2.01,3.99] s=0.974 {'mean_variant_rms_db': -38.72, 'ref_frozen_fraction': 0.935}
+      PRED energy_reduction  [2.01,4.00] s=1.0 {'mean_delta_rms_db': -21.1}
+smp-3ce14d39 syn_2 GT energy_reduction  [2.00,4.00] {'gain_db': -24.0, 'segment_sec': 2.0}
+      PRED energy_reduction  [2.01,3.99] s=1.0 {'mean_delta_rms_db': -21.26}
+      PRED pause_insertion   [2.01,3.99] s=0.98 {'mean_variant_rms_db': -38.73, 'ref_frozen_fraction': 0.949}
+smp-3e739639 syn_3 GT pause_insertion   [3.00,4.00] {'duration_sec': 1.0}
+      PRED pause_insertion   [3.00,3.99] s=0.994 {'mean_variant_rms_db': -118.02, 'ref_frozen_fraction': 1.0}
+      PRED energy_reduction  [3.01,4.00] s=0.864 {'mean_delta_rms_db': -100.86}
+smp-7da9b642 syn_2 GT tempo_change      [2.00,4.86] {'rate': 0.7, 'segment_sec': 2.0}
+smp-8b430837 syn_0 GT pause_insertion   [3.00,4.00] {'duration_sec': 1.0}
+      PRED pause_insertion   [3.01,3.99] s=0.988 {'mean_variant_rms_db': -119.02, 'ref_frozen_fraction': 1.0}
+      PRED energy_reduction  [3.01,4.00] s=0.864 {'mean_delta_rms_db': -100.99}
+smp-8e7276d4 syn_0 GT tempo_change      [2.00,4.86] {'rate': 0.7, 'segment_sec': 2.0}
+smp-a654cf9d syn_3 GT tempo_change      [2.00,4.86] {'rate': 0.7, 'segment_sec': 2.0}
+      PRED tempo_change      [2.67,2.93] s=0.669 {'direction': 'slower', 'estimated_relative_rate': 0.485}
+smp-d3cba26c syn_1 GT pause_insertion   [3.00,4.00] {'duration_sec': 1.0}
+      PRED pause_insertion   [3.01,3.99] s=0.982 {'mean_variant_rms_db': -119.01, 'ref_frozen_fraction': 0.99}
+      PRED energy_reduction  [3.01,4.00] s=0.864 {'mean_delta_rms_db': -100.72}
+smp-de1915d5 syn_1 GT tempo_change      [2.00,4.86] {'rate': 0.7, 'segment_sec': 2.0}
+smp-f9e0dc2d syn_1 GT energy_reduction  [2.00,4.00] {'gain_db': -24.0, 'segment_sec': 2.0}
+      PRED energy_reduction  [2.01,3.99] s=1.0 {'mean_delta_rms_db': -21.24}
+      PRED pause_insertion   [2.01,3.99] s=0.984 {'mean_variant_rms_db': -38.73, 'ref_frozen_fraction': 0.96}

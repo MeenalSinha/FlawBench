@@ -172,8 +172,8 @@ def test_missing_rights_and_transcript_are_errors(built: DatasetGenerator) -> No
 
 
 def test_unknown_redistribution_is_a_warning_not_an_error(ds_root: Path, ds_config: Config) -> None:
-    from conftest import REGISTER_DEFAULTS, write_fixture
     from flawbench.dataset.registry import SourceRegistry
+    from tests.conftest import REGISTER_DEFAULTS, write_fixture
 
     SourceRegistry(ds_config).register(
         write_fixture(ds_root, "r.wav", seed=6),

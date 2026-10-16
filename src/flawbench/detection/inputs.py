@@ -7,12 +7,30 @@ any ground-truth flaw annotations.
 
 from __future__ import annotations
 
+from flawbench.config import (
+    DEFAULT_ALIGNMENT_EXCLUDE_ENERGY_COEFFICIENT,
+    DEFAULT_ALIGNMENT_METRIC,
+    DetectionSettings,
+)
 from flawbench.dataset.io import read_jsonl_lenient
 from flawbench.detection.schema import DetectionInput
 from flawbench.exceptions import DetectionInputError
-from flawbench.features.comparison import compare_features
+from flawbench.features.comparison import ComparisonResult, compare_features
 from flawbench.features.extractor import FeatureResult
 from flawbench.features.pipeline import FeaturePipeline
+
+
+def _compare_for_detection(
+    ref: FeatureResult, var: FeatureResult, settings: DetectionSettings | None
+) -> ComparisonResult:
+    """Alignment used for detection, driven by the central detection settings."""
+    if settings is None:
+        metric = DEFAULT_ALIGNMENT_METRIC
+        exclude_c0 = DEFAULT_ALIGNMENT_EXCLUDE_ENERGY_COEFFICIENT
+    else:
+        metric = settings.alignment_metric
+        exclude_c0 = settings.alignment_exclude_energy_coefficient
+    return compare_features(ref, var, metric=metric, exclude_energy_coefficient=exclude_c0)
 
 
 def build_detection_input_from_features(
@@ -20,12 +38,13 @@ def build_detection_input_from_features(
     var_features: FeatureResult,
     sample_id: str = "test-sample",
     source_id: str = "test-source",
+    settings: DetectionSettings | None = None,
 ) -> DetectionInput:
     """Construct a label-free DetectionInput directly from FeatureResults.
 
     Useful for hermetic testing, synthetic audio evaluation, and programmatic detection.
     """
-    comparison = compare_features(ref_features, var_features)
+    comparison = _compare_for_detection(ref_features, var_features, settings)
     return DetectionInput(
         sample_id=sample_id,
         source_id=source_id,
@@ -45,6 +64,7 @@ def build_detection_input(
     sample_id: str,
     feature_pipeline: FeaturePipeline,
     force_extract: bool = False,
+    settings: DetectionSettings | None = None,
 ) -> DetectionInput:
     """Resolve a dataset sample and construct a label-free DetectionInput.
 
@@ -77,7 +97,9 @@ def build_detection_input(
     try:
         ref_feat = feature_pipeline.extract_reference(target_source_id, force=force_extract)
         var_feat = feature_pipeline.extract_variant(sample_id, force=force_extract)
-        comparison = compare_features(ref_feat, var_feat)
+        comparison = _compare_for_detection(
+            ref_feat, var_feat, settings or feature_pipeline.config.detection
+        )
     except Exception as exc:
         raise DetectionInputError(
             f"Failed to extract features or comparison for sample '{sample_id}': {exc}",

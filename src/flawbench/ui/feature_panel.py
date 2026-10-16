@@ -322,7 +322,11 @@ def render_features_panel(config: Config, paths: ProjectPaths, *, expose_details
             st.info("No variant feature artifacts in store. Extract dataset variants first.")
             return
 
-        var_options = {f"{v.sample_id} (derived from {v.source_id})": v.sample_id for v in variants}
+        var_options: dict[str, str] = {
+            f"{v.sample_id} (derived from {v.source_id})": v.sample_id
+            for v in variants
+            if v.sample_id is not None
+        }
         chosen_var_label = st.selectbox(
             "Select variant sample to compare", list(var_options.keys())
         )
